@@ -1,0 +1,161 @@
+/* 🔹 GENERAL RESET */
+.navbar-reset {
+  all: unset;
+  box-sizing: border-box;
+}
+
+/* 🔹 CONTAINER */
+.navbar-container {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* 🔹 DESKTOP NAVBAR */
+.desktop-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  z-index: 30;
+}
+
+.navbar-logo img {
+  height: 5rem;
+  object-fit: contain;
+}
+
+.navbar-center {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 9999px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 0.75rem 2rem;
+  display: flex;
+  gap: 3rem;
+  align-items: center;
+}
+
+.navbar-link {
+  font-weight: 500;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.navbar-link:hover {
+  color: #2563eb;
+  transform: scale(1.05);
+}
+
+.navbar-link.active {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.navbar-link svg {
+  margin-top: 0.25rem;
+  height: 1.5rem;
+  width: 1.5rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.navbar-link.active svg {
+  opacity: 1;
+}
+
+/* 🔹 MOBILE NAVBAR */
+.mobile-navbar-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  bottom: 0.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 1rem);
+  background: white;
+  border-radius: 1.5rem;
+  border-top: 1px solid #ccc;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #444;
+  transition: all 0.3s ease;
+}
+
+.mobile-nav-item.active {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.mobile-nav-item svg {
+  font-size: 1.5rem;
+  margin-bottom: 0.2rem;
+}
+
+/* 🔹 MOBILE MORE MENU */
+.mobile-more-menu {
+  width: 100%;
+  background: white;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.mobile-more-item {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #444;
+  transition: color 0.3s ease;
+}
+
+.mobile-more-item svg {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.mobile-more-item:hover {
+  color: #2563eb;
+}
+
+/* 🔹 RESPONSIVENESS */
+@media (min-width: 768px) {
+  .mobile-navbar-wrapper,
+  .mobile-more-menu {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-navbar {
+    display: none;
+  }
+}
+
+/* Additional Smooth Transitions */
+.navbar-link,
+.mobile-nav-item,
+.mobile-more-item {
+  transition: color 0.3s ease, transform 0.3s ease;
+}
