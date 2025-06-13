@@ -103,7 +103,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
   const isActive = pathname === to;
 
   return (
-    <motion.div whileTap={{ scale: 0.95 }} className="relative flex flex-col items-center text-xs">
+    <motion.div whileTap={{ scale: 0.95 }} className="relative flex flex-col items-center text-sm">
       <Link
         to={to}
         className={`flex flex-col items-center justify-center text-sm ${
@@ -269,13 +269,13 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="md:hidden fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm p-4 flex justify-between items-center z-50"
+        className="md:hidden fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm p-1 flex justify-between items-center z-50"
       >
         <Link to="/" className="flex flex-row items-center">
           <img
             src={Logo}
             alt="Company Logo"
-            className="object-contain h-12 w-auto"
+            className="object-contain h-10 w-auto"
           />
         </Link>
         <button
@@ -298,7 +298,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
             className="md:hidden fixed top-0 right-0 h-full w-full bg-white z-40 p-6 overflow-y-auto shadow-lg"
             ref={mobileNavRef}
           >
-            <div className="flex flex-col items-start space-y-4 pt-20"> {/* Adjusted padding for fixed header */}
+            <div className="flex flex-col items-start space-y-4 pb-10 pt-20"> {/* Adjusted padding for fixed header */}
               <MobileNavItem to="/" icon={<Home size={20} />} label="Home" />
               <MobileNavItem to="/products" icon={<Package size={20} />} label="Products" />
               <MobileNavItem to="/categories" icon={<Tag size={20} />} label="Categories" />
@@ -306,7 +306,6 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
               <MobileNavItem to="/contact" icon={<Phone size={20} />} label="Contact" />
               <MobileNavItem to="/cart" icon={<ShoppingCart size={20} />} label="Cart" />
               <MobileNavItem to="/wishlist" icon={<Heart size={20} />} label="Wishlist" />
-              <MobileNavItem to="/checkout" icon={<ListOrdered size={20} />} label="Checkout" />
 
               <div className="w-full h-px bg-gray-200 my-4" /> {/* Divider */}
 
@@ -349,12 +348,12 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
   initial={{ y: 100, opacity: 0 }}
   animate={{ y: 0, opacity: 1 }}
   transition={{ type: "spring", stiffness: 120, damping: 15 }}
-  className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-4 py-2 flex justify-between items-center z-50"
+  className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-4  flex justify-between items-center z-50"
 >
-  <MobileNav to="/" icon={<Home size={24} />} label="Home" />
-  <MobileNav to="/products" icon={<ShoppingCart size={24} />} label="Shop" />
-  <MobileNav to="/cart" icon={<ShoppingCart size={24} />} label="Cart" badgeCount={2} />
-  <MobileNav to="/wishlist" icon={<Heart size={24} />} label="Wishlist" badgeCount={4} />
+  <MobileNav to="/" icon={<Home size={22} />} label="Home" />
+  <MobileNav to="/products" icon={<ShoppingCart size={22} />} label="Shop" />
+  <MobileNav to="/cart" icon={<ShoppingCart size={22} />} label="Cart" badgeCount={2} />
+  <MobileNav to="/wishlist" icon={<Heart size={22} />} label="Wishlist" badgeCount={4} />
 </motion.nav>
 
     </div>

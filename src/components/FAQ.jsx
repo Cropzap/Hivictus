@@ -52,29 +52,37 @@ const FAQ = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br flex items-center justify-center p-4 sm:p-6">
       <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 w-full max-w-3xl border border-gray-200 relative overflow-hidden"
+        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+        className=" rounded-3xl shadow-2xl p-6 md:p-10 w-full max-w-4xl border border-gray-100 relative overflow-hidden"
       >
-        <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-8 flex items-center justify-center space-x-3">
-          <HelpCircle size={32} className="text-blue-500" />
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-center text-gray-800 mb-8 flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+          <HelpCircle size={36} className="text-blue-600 animate-pulse-slight" />
           <span>Frequently Asked Questions</span>
         </h2>
 
         <div className="space-y-4">
           {faqData.map((faq) => (
-            <div key={faq.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <motion.div
+              key={faq.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: faq.id * 0.1 }}
+              className="border border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300"
+            >
               {/* Question Header */}
               <motion.button
-                className="w-full text-left p-4 md:p-5 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                className="w-full text-left p-4 sm:p-5 flex justify-between items-center bg-gray-50 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 onClick={() => toggleFAQ(faq.id)}
                 aria-expanded={openId === faq.id}
                 aria-controls={`faq-answer-${faq.id}`}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
               >
-                <span className="text-lg md:text-xl font-semibold text-gray-800">
+                <span className="text-base sm:text-lg font-semibold text-gray-800">
                   {faq.question}
                 </span>
                 <motion.div
@@ -97,16 +105,31 @@ const FAQ = () => {
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                     className="overflow-hidden" // Important for height animation
                   >
-                    <div className="p-4 md:p-5 text-gray-700 leading-relaxed bg-white border-t border-gray-200">
+                    <div className="p-4 sm:p-5 text-sm sm:text-base text-gray-700 leading-relaxed bg-white border-t border-gray-200">
                       {faq.answer}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </motion.div>
           ))}
         </div>
       </motion.div>
+      {/* Background decoration for more attractiveness */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 0.1, scale: 1 }}
+          transition={{ duration: 2, ease: "easeOut", repeat: Infinity, repeatType: "mirror" }}
+          className="absolute top-1/4 left-1/4 w-48 h-48 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20"
+        ></motion.div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 0.1, scale: 1 }}
+          transition={{ duration: 2.5, ease: "easeOut", delay: 0.5, repeat: Infinity, repeatType: "mirror" }}
+          className="absolute bottom-1/3 right-1/3 w-64 h-64 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20"
+        ></motion.div>
+      </div>
     </div>
   );
 };
