@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -23,82 +23,8 @@ import {
 } from "lucide-react"; // Updated Lucide-React imports
 import Logo from "../assets/cropzap.png"; // Assuming this is your main logo
 
-const Navbar = ({ isLoggedIn, handleLogout }) => {
-  const [isClient, setIsClient] = useState(false);
-  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false); // Renamed for clarity
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("/");
-  const location = useLocation();
-
-  const accountDropdownRef = useRef(null); // Renamed ref
-  const mobileNavRef = useRef(null);
-  const mobileMenuButtonRef = useRef(null);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    setActiveTab(location.pathname);
-  }, [location.pathname]);
-
-  // Close dropdowns/menus on outside click
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target)) {
-        setIsAccountDropdownOpen(false);
-      }
-      if (
-        mobileNavRef.current &&
-        !mobileNavRef.current.contains(event.target) &&
-        mobileMenuButtonRef.current &&
-        !mobileMenuButtonRef.current.contains(event.target)
-      ) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  if (!isClient) return null;
-
-  const navLinkClass = (path) =>
-    `relative flex flex-col items-center py-2 px-4 transition-all duration-300 ease-in-out text-sm
-    ${
-      location.pathname === path
-        ? "text-blue-600 font-semibold after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-3/4 after:h-0.5 after:bg-blue-600 after:rounded-full"
-        : "text-gray-700 hover:text-blue-500"
-    }`;
-
-  const mobileNavLinkClass = (path) =>
-    `flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-300
-    ${
-      location.pathname === path
-        ? "bg-blue-600 text-white shadow-md"
-        : "text-gray-700 hover:bg-gray-100"
-    }`;
-
-  const MobileNavItem = ({ to, onClick, icon, label }) => {
-    return (
-      <motion.div whileTap={{ scale: 0.98 }} className="w-full">
-        {to ? (
-          <Link to={to} onClick={() => { setActiveTab(to); setIsMobileMenuOpen(false); }} className={mobileNavLinkClass(to)}>
-            {icon}
-            <span className="text-base font-medium">{label}</span>
-          </Link>
-        ) : (
-          <button onClick={onClick} className={mobileNavLinkClass()}>
-            {icon}
-            <span className="text-base font-medium">{label}</span>
-          </button>
-        )}
-      </motion.div>
-    );
-  };
-
-  const MobileNav = ({ to, icon, label, badgeCount = 0 }) => {
+// --- START: Move MobileNav outside Navbar component ---
+const MobileNav = ({ to, icon, label, badgeCount = 0 }) => {
   const { pathname } = useLocation();
   const isActive = pathname === to;
 
@@ -123,6 +49,142 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
     </motion.div>
   );
 };
+// --- END: Move MobileNav outside Navbar component ---
+
+
+const Navbar = ({ isLoggedIn, handleLogout }) => {
+  const [isClient, setIsClient] = useState(false);
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("/"); // This state seems redundant if you're using location.pathname
+  const location = useLocation();
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  const accountDropdownRef = useRef(null);
+  const mobileNavRef = useRef(null); // This ref is for the full-screen mobile menu
+  const mobileMenuButtonRef = useRef(null);
+
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // While `activeTab` state is present, `location.pathname` is often sufficient
+  useEffect(() => {
+    setActiveTab(location.pathname);
+  }, [location.pathname]);
+
+  // Close dropdowns/menus on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target)) {
+        setIsAccountDropdownOpen(false);
+      }
+      if (
+        mobileNavRef.current &&
+        !mobileNavRef.current.contains(event.target) &&
+        mobileMenuButtonRef.current &&
+        !mobileMenuButtonRef.current.contains(event.target)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // --- Scroll detection and idle timer for the bottom mobile nav bar ---
+  useEffect(() => {
+    const handleScroll = () => {
+      // Hide on scroll down, show on scroll up
+      if (window.scrollY > lastScrollY) {
+        setIsVisible(false);
+      } else {
+        setIsVisible(true);
+      }
+      setLastScrollY(window.scrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [lastScrollY]); // Depend on lastScrollY
+
+  useEffect(() => {
+    let idleTimer;
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        setIsVisible(false);
+      }, 3000); // Hide after 3 seconds of inactivity
+    };
+
+    // Initial setup
+    resetIdleTimer();
+
+    const handleUserActivity = () => {
+      setIsVisible(true); // Show nav on any activity
+      resetIdleTimer(); // Reset the timer
+    };
+
+    // Add event listeners for various user activities
+    window.addEventListener("scroll", handleUserActivity);
+    window.addEventListener("mousemove", handleUserActivity);
+    window.addEventListener("keydown", handleUserActivity);
+    // window.addEventListener("click", handleUserActivity);
+
+    return () => {
+      clearTimeout(idleTimer);
+      // Clean up event listeners
+      window.removeEventListener("scroll", handleUserActivity);
+      window.removeEventListener("mousemove", handleUserActivity);
+      window.removeEventListener("keydown", handleUserActivity);
+      window.removeEventListener("click", handleUserActivity);
+    };
+  }, []); // Empty dependency array for this effect to run once on mount and cleanup on unmount
+  // --- End scroll detection and idle timer ---
+
+
+  if (!isClient) return null; // Render nothing on server-side if this is an SSR app
+
+  const navLinkClass = (path) =>
+    `relative flex flex-col items-center py-2 px-4 transition-all duration-300 ease-in-out text-sm
+    ${
+      location.pathname === path
+        ? "text-blue-600 font-semibold after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-3/4 after:h-0.5 after:bg-blue-600 after:rounded-full"
+        : "text-gray-700 hover:text-blue-500"
+    }`;
+
+  const mobileNavLinkClass = (path) =>
+    `flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-300
+    ${
+      location.pathname === path
+        ? "bg-blue-600 text-white shadow-md"
+        : "text-gray-700 hover:bg-gray-100"
+    }`;
+
+  const MobileNavItem = ({ to, onClick, icon, label }) => {
+    return (
+      <motion.div whileTap={{ scale: 0.98 }} className="w-full">
+        {to ? (
+          <Link to={to} onClick={() => { /* setActiveTab(to); */ setIsMobileMenuOpen(false); }} className={mobileNavLinkClass(to)}>
+            {icon}
+            <span className="text-base font-medium">{label}</span>
+          </Link>
+        ) : (
+          <button onClick={onClick} className={mobileNavLinkClass()}>
+            {icon}
+            <span className="text-base font-medium">{label}</span>
+          </button>
+        )}
+      </motion.div>
+    );
+  };
+
 
   return (
     <div className="w-full container mx-auto">
@@ -295,7 +357,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: "100%" }}
             transition={{ type: "spring", stiffness: 150, damping: 20 }}
-            className="md:hidden fixed top-0 right-0 h-full w-full bg-white z-40 p-6 overflow-y-auto shadow-lg"
+            className="md:hidden fixed top-0 right-0 h-full w-full bg-white  z-40 p-6 overflow-y-auto shadow-lg"
             ref={mobileNavRef}
           >
             <div className="flex flex-col items-start space-y-4 pb-10 pt-20"> {/* Adjusted padding for fixed header */}
@@ -344,17 +406,22 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
       </AnimatePresence>
 
       {/* 🔹 Enhanced Mobile Floating Navigation (Bottom Bar) */}
-<motion.nav
-  initial={{ y: 100, opacity: 0 }}
-  animate={{ y: 0, opacity: 1 }}
-  transition={{ type: "spring", stiffness: 120, damping: 15 }}
-  className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-4  flex justify-between items-center z-50"
->
-  <MobileNav to="/" icon={<Home size={22} />} label="Home" />
-  <MobileNav to="/products" icon={<ShoppingCart size={22} />} label="Shop" />
-  <MobileNav to="/cart" icon={<ShoppingCart size={22} />} label="Cart" badgeCount={2} />
-  <MobileNav to="/wishlist" icon={<Heart size={22} />} label="Wishlist" badgeCount={4} />
-</motion.nav>
+      <AnimatePresence>
+        {isVisible && (
+          <motion.nav
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 120, damping: 15 }}
+            className="md:hidden fixed bottom-0 left-0 w-full bg-white  transform transition-all duration-500 ease-out border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-4 flex justify-between items-center z-50"
+          >
+            <MobileNav to="/" icon={<Home size={22} />} label="Home" />
+            <MobileNav to="/products" icon={<ShoppingCart size={22} />} label="Shop" />
+            <MobileNav to="/cart" icon={<ShoppingCart size={22} />} label="Cart" badgeCount={2} />
+            <MobileNav to="/wishlist" icon={<Heart size={22} />} label="Wishlist" badgeCount={4} />
+          </motion.nav>
+        )}
+      </AnimatePresence>
 
     </div>
   );

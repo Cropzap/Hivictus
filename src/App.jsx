@@ -7,6 +7,8 @@ import FAQ from './components/FAQ';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import AboutUs from './pages/AboutUs';
+import CartPage from './pages/ShoppingCart';
+import WishlistPage from './pages/WishlistPage';
 
 function App() {
   return (
@@ -17,6 +19,8 @@ function App() {
         <Route path="/register" element={<Registration />} />
         <Route path="/login" element={<Login />} />
         <Route path="/faq" element={<FAQ />} />
+        <Route path="/cart" element={<CartPage/>} />
+        <Route path="/wishlist" element={<WishlistPage/>} />
         <Route path="/products" element={<Products />} />
         <Route path="/about" element={<AboutUs />} />
       </Routes>
