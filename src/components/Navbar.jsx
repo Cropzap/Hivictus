@@ -304,10 +304,6 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
             {/* You can add a cart item count here */}
             {/* <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">3</span> */}
           </Link>
-          <Link to="/wishlist" className="text-gray-700 hover:text-blue-600 transition-colors duration-200">
-            <Heart size={24} />
-          </Link>
-
           {isLoggedIn ? (
             <button
               onClick={handleLogout}
@@ -367,7 +363,6 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
               <MobileNavItem to="/about" icon={<Info size={20} />} label="About Us" />
               <MobileNavItem to="/contact" icon={<Phone size={20} />} label="Contact" />
               <MobileNavItem to="/cart" icon={<ShoppingCart size={20} />} label="Cart" />
-              <MobileNavItem to="/wishlist" icon={<Heart size={20} />} label="Wishlist" />
 
               <div className="w-full h-px bg-gray-200 my-4" /> {/* Divider */}
 
@@ -418,7 +413,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
             <MobileNav to="/" icon={<Home size={22} />} label="Home" />
             <MobileNav to="/products" icon={<ShoppingCart size={22} />} label="Shop" />
             <MobileNav to="/cart" icon={<ShoppingCart size={22} />} label="Cart" badgeCount={2} />
-            <MobileNav to="/wishlist" icon={<Heart size={22} />} label="Wishlist" badgeCount={4} />
+            <MobileNav to="/profile" icon={<User size={22} />} label="Profile" />
           </motion.nav>
         )}
       </AnimatePresence>

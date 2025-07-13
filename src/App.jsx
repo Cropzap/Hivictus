@@ -9,6 +9,7 @@ import Products from './pages/Products';
 import AboutUs from './pages/AboutUs';
 import CartPage from './pages/ShoppingCart';
 import WishlistPage from './pages/WishlistPage';
+import Footer from './components/Footer';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/about" element={<AboutUs />} />
       </Routes>
+      <Footer/>
     </>
   );
 }
