@@ -10,6 +10,12 @@ import AboutUs from './pages/AboutUs';
 import CartPage from './pages/ShoppingCart';
 import WishlistPage from './pages/WishlistPage';
 import Footer from './components/Footer';
+import UserProfile from './userdashboard/UserProfile';
+import UserProfileDashboard from './userdashboard/UserProfiledashboard';
+import OrderHistory from './userdashboard/OrderHistory';
+import SupportTicket from './userdashboard/SupportTicket';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsAndConditions from './components/TermsAndConditions';
 
 function App() {
   return (
@@ -24,6 +30,12 @@ function App() {
         <Route path="/wishlist" element={<WishlistPage/>} />
         <Route path="/products" element={<Products />} />
         <Route path="/about" element={<AboutUs />} />
+        <Route path="/user" element={<UserProfile/>}/>
+        <Route path="/profile" element={<UserProfileDashboard/>}/>
+        <Route path="/orderhistory" element={<OrderHistory/>}/>
+        <Route path="/support" element={<SupportTicket/>}/>
+        <Route path="privacy-policy" element={<PrivacyPolicy/>}/>
+        <Route path="/terms-and-conditions" element={<TermsAndConditions/>}/>
       </Routes>
       <Footer/>
     </>

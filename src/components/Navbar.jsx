@@ -223,9 +223,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
               About Us
             </Link>
 
-            <Link to="/contact" className={navLinkClass("/contact")}>
-              Contact
-            </Link>
+          
 
             {/* Account Dropdown */}
             <div className="relative" ref={accountDropdownRef}>
@@ -359,9 +357,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
             <div className="flex flex-col items-start space-y-4 pb-10 pt-20"> {/* Adjusted padding for fixed header */}
               <MobileNavItem to="/" icon={<Home size={20} />} label="Home" />
               <MobileNavItem to="/products" icon={<Package size={20} />} label="Products" />
-              <MobileNavItem to="/categories" icon={<Tag size={20} />} label="Categories" />
               <MobileNavItem to="/about" icon={<Info size={20} />} label="About Us" />
-              <MobileNavItem to="/contact" icon={<Phone size={20} />} label="Contact" />
               <MobileNavItem to="/cart" icon={<ShoppingCart size={20} />} label="Cart" />
 
               <div className="w-full h-px bg-gray-200 my-4" /> {/* Divider */}
