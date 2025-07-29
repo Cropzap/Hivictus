@@ -1,38 +1,79 @@
-import React, { useState, useEffect } from 'react';
-import { FaEdit, FaSave, FaTimes, FaCamera, FaUserCircle, FaPhone, FaEnvelope, FaMapMarkerAlt, FaCalendarAlt, FaVenusMars, FaBuilding, FaBriefcase, FaHome } from 'react-icons/fa'; // Added new icons
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback for handleChange
+import { FaEdit, FaSave, FaTimes, FaCamera, FaUserCircle, FaPhone, FaEnvelope, FaMapMarkerAlt, FaCalendarAlt, FaVenusMars, FaBuilding, FaBriefcase, FaHome } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Loader } from 'lucide-react'; // Corrected: Added Loader import
 
-// Mock User Data - Expanded for more details
-const initialUserData = {
-  profilePicture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf267ddc?q=80&w=2960&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB3MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Example profile pic
-  firstName: 'John',
-  lastName: 'Doe',
-  email: 'john.doe@example.com',
-  phone: '+91 98765 43210',
-  alternatePhone: '',
-  dateOfBirth: '1990-01-15',
-  gender: 'Male',
-  occupation: 'Software Engineer',
-  company: 'Tech Solutions Inc.',
-  address: {
-    street: '123 Main Street',
-    apartment: 'Apt 4B',
-    landmark: 'Near City Park',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    zip: '400001',
-    country: 'India',
-  },
-};
+// --- START: Move InputField OUTSIDE UserProfile component ---
+const InputField = ({ label, name, value, type = 'text', readOnly = false, icon: Icon, options, onChange }) => (
+  <div className="mb-2">
+    <label className="block text-gray-700 text-xs font-medium mb-0.5 flex items-center">
+      {Icon && <Icon className="mr-1.5 text-gray-500 text-sm" />}
+      {label}
+    </label>
+    {type === 'select' ? (
+      <select
+        name={name}
+        value={value}
+        onChange={onChange} // Use the passed onChange prop
+        disabled={readOnly}
+        className={`w-full p-2 rounded-lg border-2 transition-all duration-200 text-sm
+                    ${readOnly ? 'bg-gray-100 border-gray-200 text-gray-700 cursor-default' : 'bg-white border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-gray-900'}
+                    shadow-sm focus:shadow-md appearance-none pr-8`}
+      >
+        {options.map(option => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    ) : (
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange} // Use the passed onChange prop
+        readOnly={readOnly}
+        className={`w-full p-2 rounded-lg border-2 transition-all duration-200 text-sm
+                    ${readOnly ? 'bg-gray-100 border-gray-200 text-gray-700 cursor-default' : 'bg-white border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-gray-900'}
+                    shadow-sm focus:shadow-md`}
+      />
+    )}
+  </div>
+);
+// --- END: Move InputField OUTSIDE UserProfile component ---
+
 
 const UserProfile = () => {
-  const [userData, setUserData] = useState(initialUserData);
-  const [editedData, setEditedData] = useState(initialUserData); // State to hold changes before saving
+  const [userData, setUserData] = useState({
+    profilePicture: 'https://placehold.co/150x150/E0E0E0/333333?text=User',
+    firstName: '',
+    lastName: '',
+    email: '',
+    mobile: '',
+    alternatePhone: '',
+    dateOfBirth: '',
+    gender: '',
+    occupation: '',
+    company: '',
+    address: {
+      street: '',
+      apartment: '',
+      landmark: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'India',
+    },
+  });
+
+  const [editedData, setEditedData] = useState({ ...userData });
   const [editMode, setEditMode] = useState(false);
   const [showSaveMessage, setShowSaveMessage] = useState(false);
-  const [activeTab, setActiveTab] = useState('personal'); // State for active tab
+  const [activeTab, setActiveTab] = useState('personal');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Function to handle input changes
-  const handleChange = (e) => {
+  // Wrap handleChange in useCallback to prevent it from changing on every render,
+  // which ensures InputField doesn't get a new prop causing re-render issues.
+  const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     if (name.includes('address.')) {
       const addressField = name.split('.')[1];
@@ -49,123 +90,226 @@ const UserProfile = () => {
         [name]: value,
       }));
     }
-  };
+  }, []); // Empty dependency array means this function is created once
 
-  // Function to toggle edit mode
-  const toggleEditMode = () => {
-    if (editMode) {
-      // If exiting edit mode without saving, revert changes
-      setEditedData(userData);
-    }
-    setEditMode(!editMode);
-  };
-
-  // Function to save changes
-  const handleSave = () => {
-    setUserData(editedData); // Update actual user data
-    setEditMode(false); // Exit edit mode
-    setShowSaveMessage(true); // Show success message
-    setTimeout(() => setShowSaveMessage(false), 3000); // Hide message after 3 seconds
-    // In a real app, you would send editedData to a backend API here
-    console.log('Saving data:', editedData);
-  };
-
-  // Function to handle profile picture change (mock)
-  const handleProfilePicChange = (e) => {
+  const handleProfilePicChange = useCallback((e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setEditedData(prev => ({
           ...prev,
-          profilePicture: reader.result,
+          profilePicture: reader.result, // Store Base64 string
         }));
+        setError(''); // Clear any previous errors related to file upload
       };
-      reader.readAsDataURL(file);
+      reader.onerror = (error) => {
+        setError('Failed to read file: ' + error.target.error);
+        console.error("File reading error:", error);
+      };
+      reader.readAsDataURL(file); // Read file as Base64
+    }
+  }, []);
+
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setLoading(true);
+      setError('');
+      const authToken = localStorage.getItem('authToken');
+
+      if (!authToken) {
+        setError('You are not logged in. Please log in to view your profile.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:5000/api/profile', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth-token': authToken,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to fetch profile data.');
+        }
+
+        const fetchedData = {
+          profilePicture: data.profilePicture || 'https://placehold.co/150x150/E0E0E0/333333?text=User',
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          mobile: data.mobile || '',
+          alternatePhone: data.alternatePhone || '',
+          dateOfBirth: data.dateOfBirth ? data.dateOfBirth.split('T')[0] : '',
+          gender: data.gender || '',
+          occupation: data.occupation || '',
+          company: data.company || '',
+          address: {
+            street: data.address?.street || '',
+            apartment: data.address?.apartment || '',
+            landmark: data.address?.landmark || '',
+            city: data.address?.city || '',
+            state: data.address?.state || '',
+            zip: data.address?.zip || '',
+            country: data.address?.country || 'India',
+          },
+        };
+        setUserData(fetchedData);
+        setEditedData(fetchedData);
+      } catch (err) {
+        setError(err.message || 'Error fetching profile. Please try again.');
+        console.error("Fetch profile error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  const toggleEditMode = () => {
+    if (editMode) {
+      setEditedData(userData);
+      setError('');
+    }
+    setEditMode(!editMode);
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError('');
+    const authToken = localStorage.getItem('authToken');
+
+    if (!authToken) {
+      setError('Authentication token missing. Please log in.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': authToken,
+        },
+        body: JSON.stringify(editedData), // Send all edited data including Base64 image
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to update profile.');
+        }
+
+        setUserData(editedData); // Update userData with the new saved data
+        setEditMode(false);
+        setShowSaveMessage(true);
+        setTimeout(() => setShowSaveMessage(false), 3000);
+        console.log('Profile saved:', data);
+      } else {
+        const text = await response.text();
+        console.error("Server responded with non-JSON:", text);
+        throw new Error(`Server error: ${response.status} ${response.statusText}. Response was not JSON.`);
+      }
+    } catch (err) {
+      setError(err.message || 'Error saving profile. Please try again.');
+      console.error("Save profile error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Input Field Component for consistency and styling
-  const InputField = ({ label, name, value, type = 'text', readOnly = false, icon: Icon, options }) => (
-    <div className="mb-2"> {/* Reduced mb-3 to mb-2 for tighter spacing */}
-      <label className="block text-gray-700 text-xs font-medium mb-0.5 flex items-center"> {/* Reduced mb-1 to mb-0.5 */}
-        {Icon && <Icon className="mr-1.5 text-gray-500 text-sm" />} {/* Smaller icon, less margin */}
-        {label}
-      </label>
-      {type === 'select' ? (
-        <select
-          name={name}
-          value={value}
-          onChange={handleChange}
-          disabled={readOnly}
-          className={`w-full p-2 rounded-lg border-2 transition-all duration-200 text-sm
-                      ${readOnly ? 'bg-gray-100 border-gray-200 text-gray-700 cursor-default' : 'bg-white border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-gray-900'}
-                      shadow-sm focus:shadow-md appearance-none pr-8`} // Reduced p-2.5 to p-2
-        >
-          {options.map(option => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      ) : (
-        <input
-          type={type}
-          name={name}
-          value={value}
-          onChange={handleChange}
-          readOnly={readOnly}
-          className={`w-full p-2 rounded-lg border-2 transition-all duration-200 text-sm
-                      ${readOnly ? 'bg-gray-100 border-gray-200 text-gray-700 cursor-default' : 'bg-white border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-gray-900'}
-                      shadow-sm focus:shadow-md`} // Reduced p-2.5 to p-2
-        />
-      )}
-    </div>
-  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 flex items-center justify-center p-3 sm:p-4 font-sans">
+        <div className="flex flex-col items-center text-emerald-700">
+          <Loader size={48} className="animate-spin mb-4" />
+          <p className="text-lg">Loading Profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 flex items-center justify-center p-3 sm:p-4 font-sans"> {/* Reduced overall padding */}
-      <div className="relative bg-white/80 backdrop-blur-xl rounded-[1.5rem] shadow-2xl p-4 sm:p-6 md:p-8 w-full max-w-4xl border border-white/50"> {/* Reduced rounded to 1.5rem, padding */}
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 flex items-center justify-center p-3 sm:p-4 font-sans">
+      <div className="relative bg-white/80 backdrop-blur-xl rounded-[1.5rem] shadow-2xl p-4 sm:p-6 md:p-8 w-full max-w-4xl border border-white/50">
 
-        {/* Save Message */}
-        {showSaveMessage && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-semibold animate-fade-in-down z-20"> {/* Reduced padding/font size */}
-            Profile Saved Successfully!
-          </div>
-        )}
+        {/* Success/Error Messages */}
+        <AnimatePresence>
+          {showSaveMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-semibold animate-fade-in-down z-20"
+            >
+              Profile Saved Successfully!
+            </motion.div>
+          )}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute top-3 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-semibold animate-fade-in-down z-20"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
 
         {/* Header and Action Buttons */}
-        <div className="flex justify-between items-center mt-6 mb-6"> {/* Reduced mb-8 to mb-6 */}
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Profile</h1> {/* Reduced h1 size */}
+        <div className="flex justify-between items-center mt-6 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Profile</h1>
           {!editMode ? (
-            <button
+            <motion.button
               onClick={toggleEditMode}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               className="flex items-center bg-emerald-600 text-white px-3 py-1.5 text-sm rounded-full shadow-md
-                         transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95" // Reduced padding/font size
+                         transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
             >
-              <FaEdit className="mr-1.5 text-xs" /> Edit {/* Smaller icon */}
-            </button>
+              <FaEdit className="mr-1.5 text-xs" /> Edit
+            </motion.button>
           ) : (
-            <div className="flex space-x-2"> {/* Reduced space-x */}
-              <button
+            <div className="flex space-x-2">
+              <motion.button
                 onClick={handleSave}
+                disabled={loading}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 className="flex items-center bg-emerald-600 text-white px-3 py-1.5 text-sm rounded-full shadow-md
-                           transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95" // Reduced padding/font size
+                           transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
               >
-                <FaSave className="mr-1.5 text-xs" /> Save {/* Smaller icon */}
-              </button>
-              <button
+                {loading ? <Loader size={12} className="animate-spin mr-1.5" /> : <FaSave className="mr-1.5 text-xs" />} Save
+              </motion.button>
+              <motion.button
                 onClick={toggleEditMode}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 className="flex items-center bg-gray-300 text-gray-800 px-3 py-1.5 text-sm rounded-full shadow-md
-                           transition-all duration-200 hover:bg-gray-400 hover:shadow-lg active:scale-95" // Reduced padding/font size
+                           transition-all duration-200 hover:bg-gray-400 hover:shadow-lg active:scale-95"
               >
-                <FaTimes className="mr-1.5 text-xs" /> Cancel {/* Smaller icon */}
-              </button>
+                <FaTimes className="mr-1.5 text-xs" /> Cancel
+              </motion.button>
             </div>
           )}
         </div>
 
         {/* Profile Picture Section */}
-        <div className="flex flex-col items-center mb-6"> {/* Reduced mb-8 to mb-6 */}
-          <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-3 border-white shadow-lg bg-gray-200"> {/* Reduced border, slightly smaller on mobile */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-3 border-white shadow-lg bg-gray-200">
             <img
               src={editedData.profilePicture}
               alt="Profile"
@@ -174,7 +318,7 @@ const UserProfile = () => {
             />
             {editMode && (
               <label htmlFor="profile-pic-upload" className="absolute inset-0 flex items-center justify-center bg-black/40 text-white cursor-pointer opacity-0 hover:opacity-100 transition-opacity duration-200">
-                <FaCamera className="text-xl sm:text-2xl" /> {/* Responsive icon size */}
+                <FaCamera className="text-xl sm:text-2xl" />
                 <input
                   id="profile-pic-upload"
                   type="file"
@@ -186,7 +330,7 @@ const UserProfile = () => {
             )}
           </div>
           {editMode && (
-            <label htmlFor="profile-pic-upload" className="mt-3 text-emerald-600 cursor-pointer hover:underline text-xs sm:text-sm"> {/* Reduced mt, font size */}
+            <label htmlFor="profile-pic-upload" className="mt-3 text-emerald-600 cursor-pointer hover:underline text-xs sm:text-sm">
               Change Profile Picture
               <input
                 id="profile-pic-upload"
@@ -200,60 +344,80 @@ const UserProfile = () => {
         </div>
 
         {/* Animated Tabs for Sections */}
-        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-lg p-0.5 flex border border-white/70 shadow-inner"> {/* Reduced mb, padding, rounded */}
-          <button
+        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-lg p-0.5 flex border border-white/70 shadow-inner">
+          <motion.button
             onClick={() => setActiveTab('personal')}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all duration-300
                         ${activeTab === 'personal' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-700 hover:bg-white/70'}`}
           >
             Personal Details
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             onClick={() => setActiveTab('address')}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all duration-300
                         ${activeTab === 'address' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-700 hover:bg-white/70'}`}
           >
             Address
-          </button>
+          </motion.button>
         </div>
 
         {/* Tab Content - Personal Information */}
-        {activeTab === 'personal' && (
-          <div className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/70 shadow-lg animate-fade-in"> {/* Reduced padding, rounded */}
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center"> {/* Reduced h2 size, mb */}
-              <FaUserCircle className="mr-2 text-emerald-600 text-xl" /> Personal Information {/* Smaller icon */}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2"> {/* Reduced gaps */}
-              <InputField label="First Name" name="firstName" value={editedData.firstName} readOnly={!editMode} />
-              <InputField label="Last Name" name="lastName" value={editedData.lastName} readOnly={!editMode} />
-              <InputField label="Email" name="email" value={editedData.email} type="email" readOnly={true} icon={FaEnvelope} />
-              <InputField label="Phone" name="phone" value={editedData.phone} type="tel" readOnly={!editMode} icon={FaPhone} />
-              <InputField label="Alternate Phone" name="alternatePhone" value={editedData.alternatePhone} type="tel" readOnly={!editMode} icon={FaPhone} />
-              <InputField label="Date of Birth" name="dateOfBirth" value={editedData.dateOfBirth} type="date" readOnly={!editMode} icon={FaCalendarAlt} />
-              <InputField label="Gender" name="gender" value={editedData.gender} type="select" readOnly={!editMode} icon={FaVenusMars} options={['Male', 'Female', 'Other', 'Prefer not to say']} />
-              <InputField label="Occupation" name="occupation" value={editedData.occupation} readOnly={!editMode} icon={FaBriefcase} />
-              <InputField label="Company" name="company" value={editedData.company} readOnly={!editMode} icon={FaBuilding} />
-            </div>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {activeTab === 'personal' && (
+            <motion.div
+              key="personal-tab"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/70 shadow-lg"
+            >
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <FaUserCircle className="mr-2 text-emerald-600 text-xl" /> Personal Information
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
+                <InputField label="First Name" name="firstName" value={editedData.firstName} onChange={handleChange} readOnly={!editMode} />
+                <InputField label="Last Name" name="lastName" value={editedData.lastName} onChange={handleChange} readOnly={!editMode} />
+                <InputField label="Email" name="email" value={editedData.email} type="email" readOnly={true} icon={FaEnvelope} />
+                <InputField label="Phone" name="mobile" value={editedData.mobile} type="tel" readOnly={true} icon={FaPhone} />
+                <InputField label="Alternate Phone" name="alternatePhone" value={editedData.alternatePhone} onChange={handleChange} type="tel" readOnly={!editMode} icon={FaPhone} />
+                <InputField label="Date of Birth" name="dateOfBirth" value={editedData.dateOfBirth} onChange={handleChange} type="date" readOnly={!editMode} icon={FaCalendarAlt} />
+                <InputField label="Gender" name="gender" value={editedData.gender} onChange={handleChange} type="select" readOnly={!editMode} icon={FaVenusMars} options={['', 'Male', 'Female', 'Other', 'Prefer not to say']} />
+                <InputField label="Occupation" name="occupation" value={editedData.occupation} onChange={handleChange} readOnly={!editMode} icon={FaBriefcase} />
+                <InputField label="Company" name="company" value={editedData.company} onChange={handleChange} readOnly={!editMode} icon={FaBuilding} />
+              </div>
+            </motion.div>
+          )}
 
-        {/* Tab Content - Address Information */}
-        {activeTab === 'address' && (
-          <div className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/70 shadow-lg animate-fade-in"> {/* Reduced padding, rounded */}
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center"> {/* Reduced h2 size, mb */}
-              <FaMapMarkerAlt className="mr-2 text-emerald-600 text-xl" /> Shipping Address {/* Smaller icon */}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2"> {/* Reduced gaps */}
-              <InputField label="Street Address" name="address.street" value={editedData.address.street} readOnly={!editMode} icon={FaHome} />
-              <InputField label="Apartment/Suite" name="address.apartment" value={editedData.address.apartment} readOnly={!editMode} icon={FaBuilding} />
-              <InputField label="Landmark" name="address.landmark" value={editedData.address.landmark} readOnly={!editMode} />
-              <InputField label="City" name="address.city" value={editedData.address.city} readOnly={!editMode} />
-              <InputField label="State" name="address.state" value={editedData.address.state} readOnly={!editMode} />
-              <InputField label="Zip Code" name="address.zip" value={editedData.address.zip} readOnly={!editMode} />
-              <InputField label="Country" name="address.country" value={editedData.address.country} readOnly={true} />
-            </div>
-          </div>
-        )}
+          {/* Tab Content - Address Information */}
+          {activeTab === 'address' && (
+            <motion.div
+              key="address-tab"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/70 shadow-lg"
+            >
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <FaMapMarkerAlt className="mr-2 text-emerald-600 text-xl" /> Shipping Address
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
+                <InputField label="Street Address" name="address.street" value={editedData.address.street} onChange={handleChange} readOnly={!editMode} icon={FaHome} />
+                <InputField label="Apartment/Suite" name="address.apartment" value={editedData.address.apartment} onChange={handleChange} readOnly={!editMode} icon={FaBuilding} />
+                <InputField label="Landmark" name="address.landmark" value={editedData.address.landmark} onChange={handleChange} readOnly={!editMode} />
+                <InputField label="City" name="address.city" value={editedData.address.city} onChange={handleChange} readOnly={!editMode} />
+                <InputField label="State" name="address.state" value={editedData.address.state} onChange={handleChange} readOnly={!editMode} />
+                <InputField label="Zip Code" name="address.zip" value={editedData.address.zip} onChange={handleChange} readOnly={!editMode} />
+                <InputField label="Country" name="address.country" value={editedData.address.country} onChange={handleChange} readOnly={true} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </div>
     </div>

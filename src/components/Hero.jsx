@@ -1,98 +1,88 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import Hero1 from '../assets/hero1.png'; // Assuming hero1.png is a transparent 3D character
 
-// Dummy data for carousel slides
-// **IMPORTANT:** For a proper 3D view effect, ensure your `characterImage` URLs
-// point to transparent PNG files of 3D renders.
+// Import agriculture-themed background images
+// IMPORTANT: Use high-quality, relevant images for the best visual appeal.
+// Ensure these paths are correct relative to your project structure.
+import AgBannerBg1 from '../assets/farm-bg.jpg'; // Example: Healthy crops, sunrise/sunset
+import AgBannerBg2 from '../assets/farm-bg.jpg'; // Example: Modern farming equipment in action
+import AgBannerBg3 from '../assets/farm-bg.jpg'; // Example: Farmer's hands holding soil/seedling
+
+// Dummy data for banner slides - Agriculture Themed
 const slides = [
   {
     id: 1,
-    subText: "YOUR STYLE, UNLEASHED",
-    titleMain: "Discover Your",
-    titleHighlight: "Perfect Look",
-    description: "Explore our curated collection of fashion-forward apparel, accessories, and more. Elevate your wardrobe with unique pieces and timeless essentials.",
-    buttonPrimaryText: "Shop New Arrivals",
-    buttonPrimaryLink: "/products/new-arrivals",
-    buttonSecondaryText: "Explore Categories",
-    buttonSecondaryLink: "/categories",
-    characterImage: Hero1, // Using your local asset
+    title: "Precision Farming",
+    subTitle: "Cultivating Tomorrow, Today",
+    description: "Leverage data-driven insights for optimal resource management and yield.",
+    buttonText: "Discover Technology",
+    buttonLink: "/solutions/precision-farming",
+    backgroundImage: AgBannerBg1,
+    overlayColor: 'rgba(0, 0, 0, 0.35)', // Slightly darker overlay
   },
   {
     id: 2,
-    subText: "QUALITY MEETS INNOVATION",
-    titleMain: "Tech That",
-    titleHighlight: "Transforms Lives",
-    description: "From cutting-edge gadgets to smart home solutions, elevate your everyday.",
-    buttonPrimaryText: "Explore Electronics",
-    buttonPrimaryLink: "/products/electronics",
-    buttonSecondaryText: "View Deals",
-    buttonSecondaryLink: "/deals",
-    characterImage: "https://png.pngtree.com/png-vector/20230830/ourmid/pngtree-3d-character-modeling-digital-marketing-online-shoping-illustration-png-image_9190024.png",
+    title: "Sustainable Harvests",
+    subTitle: "Nourishing Land & Lives",
+    description: "Our eco-friendly methods ensure abundance for generations to come.",
+    buttonText: "Our Commitment",
+    buttonLink: "/about/sustainability",
+    backgroundImage: AgBannerBg2,
+    overlayColor: 'rgba(0, 0, 0, 0.4)', // Slightly darker overlay
   },
   {
     id: 3,
-    subText: "TASTE THE DIFFERENCE",
-    titleMain: "Gourmet Foods,",
-    titleHighlight: "Delivered Fresh",
-    description: "Indulge in premium ingredients and artisanal treats from around the world.",
-    buttonPrimaryText: "Shop Groceries",
-    buttonPrimaryLink: "/products/groceries",
-    buttonSecondaryText: "Recipes & More",
-    buttonSecondaryLink: "/recipes",
-    characterImage: "https://www.datocms-assets.com/71239/1659779361-chef-3d-character-cooking.png", // Using a direct URL for better consistency
+    title: "Empowering Growers",
+    subTitle: "Growth Beyond Expectations",
+    description: "Join a community of forward-thinking farmers and agricultural experts.",
+    buttonText: "Join Network",
+    buttonLink: "/community",
+    backgroundImage: AgBannerBg3,
+    overlayColor: 'rgba(0, 0, 0, 0.3)', // Slightly darker overlay
   },
-  {
-    id: 4,
-    subText: "HOME COMFORTS, ELEVATED",
-    titleMain: "Create Your",
-    titleHighlight: "Dream Space",
-    description: "Find exquisite furniture, decor, and essentials to style every corner of your home.",
-    buttonPrimaryText: "Browse Home Decor",
-    buttonPrimaryLink: "/products/home",
-    buttonSecondaryText: "Design Inspiration",
-    buttonSecondaryLink: "/inspiration",
-    characterImage: "https://www.datocms-assets.com/71239/1659779359-house-3d-character-holding-home.png",
-  }
 ];
 
-const Hero = () => {
-  // Re-enabled currentSlide state and interval for slideshow
+const AgBanner = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const slideIntervalRef = useRef(null);
 
-  // This is the correct and only declaration for currentSlideData
   const currentSlideData = slides[currentSlide];
 
-  // Variants for individual content elements (title, description, buttons)
+  // Variants for content (title, description, button)
   const contentVariants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }, // Slightly faster
+    hidden: { opacity: 0, x: -70 }, // Increased initial x offset
+    visible: {
+      opacity: 1,
+      x: 0,
+      transition: {
+        duration: 0.7, // Slightly slower entrance
+        ease: "easeOut",
+        staggerChildren: 0.12, // Fine-tuned stagger
+        delayChildren: 0.25, // Slightly longer delay for children
+      },
+    },
+    exit: { opacity: 0, x: -50, transition: { duration: 0.5, ease: "easeIn" } } // Exit animation
   };
 
-  // Variants for the 3D character image
-  // Adjusted for entry/exit animation, not continuous loop
-  const characterVariants = {
-    hidden: { opacity: 0, scale: 0.85, y: 40, rotateY: 0, rotateX: 0 },
-    visible: {
+  const itemVariants = {
+    hidden: { opacity: 0, x: -40 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: "easeOut" } },
+  };
+
+  // Variants for the background image animation (subtle zoom/pan and slight movement)
+  const backgroundVariants = {
+    enter: { opacity: 0, scale: 1.1, y: 10 }, // Start slightly scaled and moved down
+    center: {
       opacity: 1,
       scale: 1,
       y: 0,
-      rotateY: 0, // No continuous rotation here, but can be added with whileHover
-      rotateX: 0,
       transition: {
-        duration: 0.7,
+        duration: 1.5, // Slower, more majestic transition
         ease: "easeOut",
-        delay: 0.1, // Initial delay for character entry
-      },
+      }
     },
-    exit: {
-      opacity: 0,
-      scale: 0.85,
-      y: -20, // Move up slightly on exit
-      transition: { duration: 0.4, ease: "easeIn" },
-    },
+    exit: { opacity: 0, scale: 0.9, y: -10, transition: { duration: 1.0, ease: "easeIn" } }, // Exit slightly scaled out and moved up
   };
 
   // Carousel controls
@@ -102,126 +92,124 @@ const Hero = () => {
   // Auto-play effect
   useEffect(() => {
     if (slideIntervalRef.current) clearInterval(slideIntervalRef.current);
-    slideIntervalRef.current = setInterval(nextSlide, 5000);
+    slideIntervalRef.current = setInterval(nextSlide, 7000); // Increased interval for more breathing room
 
     return () => { if (slideIntervalRef.current) clearInterval(slideIntervalRef.current); };
   }, [currentSlide]);
 
   // Pause/Resume on hover
   const handleMouseEnter = () => { if (slideIntervalRef.current) clearInterval(slideIntervalRef.current); };
-  const handleMouseLeave = () => { slideIntervalRef.current = setInterval(nextSlide, 5000); };
+  const handleMouseLeave = () => { slideIntervalRef.current = setInterval(nextSlide, 7000); };
 
   return (
     <div
-      className="relative w-full h-[calc(100vh-64px)] bg-[#FBFBF8] flex flex-col md:flex-row overflow-hidden"
-      onMouseEnter={handleMouseEnter} // Re-enabled hover pause/resume
-      onMouseLeave={handleMouseLeave} // Re-enabled hover pause/resume
+      className="relative w-full h-[220px] md:h-[280px] lg:h-[320px] xl:h-[360px] 2xl:h-[400px] // Slightly increased height for impact
+                 overflow-hidden rounded-2xl // More pronounced rounding
+                 shadow-xl // Stronger shadow
+                 flex items-center text-white
+                 group" // Add group for hover effects on dots
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      {/* AnimatePresence for the entire slide content to handle transitions between slides */}
       <AnimatePresence initial={false} mode='wait'>
+        {/* Background Image with animated entry/exit and hover effect */}
         <motion.div
-          key={currentSlideData.id} // Key changes with each slide for AnimatePresence
-          initial="enter" // Use 'enter' for the initial state of the incoming slide
-          animate="center" // Use 'center' for the active state
-          exit="exit" // Use 'exit' for the outgoing slide
-          variants={{
-            enter: { opacity: 0 },
-            center: { opacity: 1 },
-            exit: { opacity: 0, position: 'absolute' }, // Keep position absolute for exit
-          }}
-          transition={{ opacity: { duration: 0.6 } }}
-          className="absolute inset-0 w-full h-full flex flex-col md:flex-row" // Ensure this div takes full space and uses flex
+          key={currentSlideData.id + '-bg'}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          variants={backgroundVariants}
+          className="absolute inset-0 w-full h-full"
         >
-          {/* Left Half - Text Content */}
-          <div className="relative z-10 w-full md:w-1/2 h-1/2 md:h-full flex flex-col items-center md:items-start justify-center p-6 md:p-12 text-center md:text-left">
-            {/* Inner motion.div for text content for staged animation */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              // No exit here, as the parent motion.div handles slide exit
-              className="w-full"
-            >
-              <motion.p
-                variants={contentVariants}
-                className="text-xs md:text-sm text-gray-500 uppercase tracking-widest mb-2 md:mb-3"
-              >
-                {currentSlideData.subText}
-              </motion.p>
-              <motion.h1
-                variants={contentVariants}
-                className="text-4xl leading-tight md:text-6xl font-extrabold text-gray-900 mb-3 md:mb-4"
-              >
-                {currentSlideData.titleMain}{' '}
-                <span
-                  className={`bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-orange-600`}
-                >
-                  {currentSlideData.titleHighlight}
-                </span>
-              </motion.h1>
-              <motion.p
-                variants={contentVariants}
-                className="text-base md:text-lg text-gray-600 max-w-md mx-auto md:mx-0 mb-6 md:mb-8"
-              >
-                {currentSlideData.description}
-              </motion.p>
-              <motion.div
-                variants={contentVariants}
-                className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4 w-full justify-center md:justify-start"
-              >
-                <Link
-                  to={currentSlideData.buttonPrimaryLink}
-                  className="inline-block bg-orange-500 hover:bg-orange-600 text-white text-base font-semibold py-2 px-6 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg w-full md:w-auto"
-                >
-                  {currentSlideData.buttonPrimaryText}
-                </Link>
-                <Link
-                  to={currentSlideData.buttonSecondaryLink}
-                  className="inline-block bg-transparent border-2 border-gray-400 hover:border-gray-600 text-gray-700 hover:text-gray-900 text-base font-semibold py-2 px-6 rounded-xl transition-all duration-300 w-full md:w-auto"
-                >
-                  {currentSlideData.buttonSecondaryText}
-                </Link>
-              </motion.div>
-            </motion.div>
-          </div>
-
-          {/* Right Half - Character Image with 3D Effect */}
+          <img
+            src={currentSlideData.backgroundImage}
+            alt="Agriculture Background"
+            className="w-full h-full object-cover object-center transform transition-transform duration-500 ease-out group-hover:scale-105" // Subtle zoom on group hover
+          />
+          {/* Dynamic Overlay for better text readability */}
           <div
-            className="relative w-full md:w-1/2 h-1/2 md:h-full flex items-center justify-center overflow-hidden"
-            style={{ perspective: '1500px' }} // Increased perspective for stronger 3D
+            className="absolute inset-0 transition-colors duration-500" // Smooth transition for overlay
+            style={{ backgroundColor: currentSlideData.overlayColor }}
+          ></div>
+        </motion.div>
+
+        {/* Content Overlay - Left-aligned and centered vertically */}
+        <motion.div
+          key={currentSlideData.id + '-content'}
+          initial="hidden"
+          animate="visible"
+          exit="exit" // Use exit from contentVariants for fade out
+          variants={contentVariants}
+          className="relative z-10 p-6 md:p-8 lg:p-10 flex flex-col items-start text-left
+                     w-full max-w-xl // Adjusted max-width for content area
+                     ml-6 md:ml-10 lg:ml-16 // Increased left margin
+                     pointer-events-none" // Allow clicks to pass through to underlying elements like buttons
+        >
+          <motion.h2
+            variants={itemVariants}
+            className="text-lg md:text-xl lg:text-2xl font-semibold uppercase tracking-widest // Increased tracking
+                       text-lime-300 // Brighter lime color
+                       mb-1.5 md:mb-2.5 // Adjusted margin
+                       drop-shadow-lg // Stronger drop shadow for emphasis
+                       font-['Montserrat',_sans-serif] // Using a clean, modern font if available
+                       "
           >
-            {/* The character motion.img is now directly controlled by AnimatePresence in the main motion.div */}
-            <motion.img
-              key={currentSlideData.id + '-image'} // Key needs to be unique for each image per slide
-              src={currentSlideData.characterImage}
-              alt="3D Product Character"
-              variants={characterVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit" // Character also exits when slide changes
-              className="relative z-10 w-4/5 md:w-3/4 max-w-sm md:max-w-md h-auto object-contain pointer-events-auto
-                         drop-shadow-[0_15px_30px_rgba(0,0,0,0.35)]"
-              whileHover={{
-                scale: 1.08, // Slightly larger scale on hover
-                rotateY: [-5, 5], // More pronounced hover tilt
-                rotateX: [3, -3],
-                y: [-10, 10], // Slight float on hover
-                transition: { duration: 0.3, ease: 'easeOut', repeat: Infinity, repeatType: "mirror" },
-              }}
-            />
-          </div>
+            {currentSlideData.subTitle}
+          </motion.h2>
+          <motion.h1
+            variants={itemVariants}
+            className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-3 md:mb-4 lg:mb-5 // Larger font for main title
+                       leading-tight // Tighter line height
+                       text-white drop-shadow-2xl // Stronger shadow for main title
+                       font-['Roboto_Slab',_serif] // A strong, readable serif font
+                       "
+          >
+            {currentSlideData.title}
+          </motion.h1>
+          <motion.p
+            variants={itemVariants}
+            className="text-sm md:text-base lg:text-lg text-gray-200 max-w-lg mb-6 md:mb-8 lg:mb-10 // Larger description
+                       drop-shadow-md // Moderate shadow
+                       font-['Open_Sans',_sans-serif] // Readable body font
+                       "
+          >
+            {currentSlideData.description}
+          </motion.p>
+          <motion.div
+            variants={itemVariants}
+            className="flex space-x-4 pointer-events-auto" // Re-enable pointer events for buttons
+          >
+            <Link
+              to={currentSlideData.buttonLink}
+              className="inline-flex items-center justify-center // Flexbox for centering text
+                         bg-gradient-to-br from-green-600 to-emerald-700 // Gradient button
+                         hover:from-green-700 hover:to-emerald-800
+                         text-white text-base md:text-lg font-bold // Bolder text
+                         py-3 px-8 rounded-full // Pill-shaped button
+                         transition-all duration-300 ease-out
+                         shadow-lg hover:shadow-xl // Stronger shadow
+                         transform hover:scale-105 hover:rotate-1 // Subtle rotate on hover
+                         border-2 border-transparent hover:border-green-300 // Green border on hover
+                         "
+            >
+              {currentSlideData.buttonText}
+              {/* Optional: Add an icon for extra appeal */}
+              <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </Link>
+          </motion.div>
         </motion.div>
       </AnimatePresence>
 
-      {/* Navigation Dots - Re-enabled */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
+      {/* Navigation Dots - More subtle and aligned */}
+      <div className="absolute bottom-5 right-6 z-20 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         {slides.map((_, index) => (
           <motion.button
             key={index}
             onClick={() => goToSlide(index)}
-            whileHover={{ scale: 1.2 }}
+            whileHover={{ scale: 1.4, backgroundColor: 'rgba(255,255,255,0.9)' }} // More pronounced hover
             whileTap={{ scale: 0.9 }}
-            className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
-              index === currentSlide ? 'bg-gray-800' : 'bg-gray-400 hover:bg-gray-600'
+            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 border border-white ${
+              index === currentSlide ? 'bg-white scale-125' : 'bg-gray-400/50 hover:bg-white/70' // Semi-transparent inactive, brighter active
             }`}
             aria-label={`Go to slide ${index + 1}`}
           ></motion.button>
@@ -231,4 +219,4 @@ const Hero = () => {
   );
 };
 
-export default Hero;
+export default AgBanner;
