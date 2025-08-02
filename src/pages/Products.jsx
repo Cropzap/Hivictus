@@ -5,7 +5,7 @@ import {
   FaStar, FaStarHalfAlt, FaRegStar,
   FaShoppingCart, FaFilter, FaRedo, FaSearch, FaTimes
 } from 'react-icons/fa';
-import { Loader } from 'lucide-react'; // For loading indicator
+import { Loader, CheckCircle } from 'lucide-react'; // For loading indicator and success icon
 
 // Star Rendering Component - Improved for professional look
 const renderStars = (rating) => {
@@ -25,7 +25,7 @@ const ProductCard = ({ product, showToastMessage }) => { // Accept showToastMess
 
   // Fetch auth token from localStorage on component mount
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken'); // Assuming 'authToken' for buyers
     if (token) {
       setAuthToken(token);
     }
@@ -60,7 +60,7 @@ const ProductCard = ({ product, showToastMessage }) => { // Accept showToastMess
       const response = await fetch('http://localhost:5000/api/cart/add', {
         method: 'POST',
         headers: {
-          'x-auth-token': authToken, // Send the auth token
+          'x-auth-token': authToken, // This sends the buyer's authentication token
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ productId: product._id, quantity: 1 }), // Add 1 quantity by default
@@ -70,7 +70,7 @@ const ProductCard = ({ product, showToastMessage }) => { // Accept showToastMess
         if (response.status === 401) {
           showToastMessage('Session expired. Please log in again.', 'error');
           localStorage.removeItem('authToken'); // Clear invalid token
-          localStorage.removeItem('userData');
+          localStorage.removeItem('userData'); // Assuming buyer's user data is stored here
           navigate('/login'); // Redirect to login
         } else {
           const errorData = await response.json();
@@ -234,7 +234,7 @@ const FilterContent = ({ handleFilterChange, handlePriceRangeChange, resetFilter
           placeholder="Min"
           step="0.01"
           min="0"
-          max="100"
+          max="100" // Consider adjusting max value based on your actual product prices
           className="w-1/2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
         />
         <span className="text-gray-500">-</span>
@@ -246,7 +246,7 @@ const FilterContent = ({ handleFilterChange, handlePriceRangeChange, resetFilter
           placeholder="Max"
           step="0.01"
           min="0"
-          max="100"
+          max="100" // Consider adjusting max value based on your actual product prices
           className="w-1/2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
         />
       </div>
@@ -315,7 +315,7 @@ const Products = () => {
     category: 'All',
     subCategory: 'All',
     type: 'All',
-    priceRange: [0, 100],
+    priceRange: [0, 100], // Default max price might need adjustment based on data
     minRating: 0,
     searchQuery: '',
     sortBy: 'default',
@@ -344,20 +344,24 @@ const Products = () => {
         }
         const data = await response.json();
         // Add dummy sellerName and rating for UI purposes if not present
-        const productsWithDummyData = data.map(p => ({
+        const productsWithParsedData = data.map(p => ({
           ...p,
-          sellerName: p.sellerId?.companyName || p.sellerId?.contactPerson || 'Unknown Seller',
+          // Ensure sellerName is correctly pulled from populated sellerId
+          sellerName: p.sellerId?.sellerName || p.sellerId?.companyName || 'Unknown Seller',
           rating: p.rating !== undefined ? p.rating : parseFloat((Math.random() * 5).toFixed(1)), // Add dummy rating if missing
         }));
 
-        setAllProducts(productsWithDummyData);
-        setFilteredProducts(productsWithDummyData);
+        setAllProducts(productsWithParsedData);
+        setFilteredProducts(productsWithParsedData);
 
-        const uniqueCategories = ['All', ...new Set(productsWithDummyData.map(p => p.category?.name).filter(Boolean))];
-        const uniqueTypes = ['All', ...new Set(productsWithDummyData.map(p => p.type).filter(Boolean))];
+        const uniqueCategories = ['All', ...new Set(productsWithParsedData.map(p => p.category?.name).filter(Boolean))];
+        const uniqueTypes = ['All', ...new Set(productsWithParsedData.map(p => p.type).filter(Boolean))];
         setAllCategories(uniqueCategories);
         setAllTypes(uniqueTypes);
 
+        // Dynamically set max price from fetched products
+        const maxPrice = productsWithParsedData.reduce((max, p) => Math.max(max, p.price), 0);
+        setFilters(prev => ({ ...prev, priceRange: [0, maxPrice > 0 ? maxPrice : 100] })); // Ensure maxPrice is at least 100 if no products
       } catch (err) {
         setError(err.message);
         console.error("Error fetching products:", err);
@@ -451,11 +455,12 @@ const Products = () => {
   };
 
   const resetFilters = () => {
+    const maxPrice = allProducts.reduce((max, p) => Math.max(max, p.price), 0);
     setFilters({
       category: 'All',
       subCategory: 'All',
       type: 'All',
-      priceRange: [0, 100],
+      priceRange: [0, maxPrice > 0 ? maxPrice : 100], // Reset to initial dynamic max price
       minRating: 0,
       searchQuery: '',
       sortBy: 'default',

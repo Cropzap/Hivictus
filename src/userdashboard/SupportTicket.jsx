@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { FaTicketAlt, FaTag, FaClipboardList, FaFileAlt, FaPaperclip, FaCheckCircle, FaExclamationCircle, FaTimes, FaHashtag, FaHourglassHalf, FaEye, FaCalendarAlt, FaBoxOpen, FaCommentDots, FaTrashAlt, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FaTicketAlt, FaTag, FaClipboardList, FaFileAlt, FaPaperclip, FaCheckCircle, FaExclamationCircle, FaTimes, FaHashtag, FaHourglassHalf, FaEye, FaCalendarAlt, FaBoxOpen, FaCommentDots, FaTrashAlt, FaChevronLeft, FaChevronRight, FaReply, FaUserTie, FaUser, FaSpinner } from 'react-icons/fa'; // Added FaSpinner, FaUserTie, FaUser (for buyer in replies)
+import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Helper to get status badge styling ---
 const getStatusBadge = (status) => {
@@ -44,7 +45,7 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
   });
 
   // Reset form when submitSuccess changes to true (after successful submission)
-  React.useEffect(() => {
+  useEffect(() => {
     if (submitSuccess) {
       setFormData({
         subject: '',
@@ -72,10 +73,10 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
   };
 
   return (
-    <form onSubmit={handleSubmitInternal} className="space-y-4"> {/* Reduced space-y */}
+    <form onSubmit={handleSubmitInternal} className="space-y-4">
       {/* Subject Field */}
-      <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 border border-white/70 shadow-lg"> {/* Reduced padding */}
-        <label htmlFor="subject" className="block text-gray-700 text-xs sm:text-sm font-medium mb-1 flex items-center"> {/* Reduced mb */}
+      <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 border border-white/70 shadow-lg">
+        <label htmlFor="subject" className="block text-gray-700 text-xs sm:text-sm font-medium mb-1 flex items-center">
           <FaTag className="mr-1.5 text-gray-500 text-sm" /> Subject / Topic
         </label>
         <input
@@ -89,11 +90,11 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
                       ${errors.subject ? 'border-red-500' : 'border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'}
                       bg-white shadow-sm focus:shadow-md`}
         />
-        {errors.subject && <p className="text-red-500 text-xs mt-0.5">{errors.subject}</p>} {/* Reduced mt */}
+        {errors.subject && <p className="text-red-500 text-xs mt-0.5">{errors.subject}</p>}
       </div>
 
       {/* Category Field */}
-      <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 border border-white/70 shadow-lg"> {/* Reduced padding */}
+      <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 border border-white/70 shadow-lg">
         <label htmlFor="category" className="block text-gray-700 text-xs sm:text-sm font-medium mb-1 flex items-center">
           <FaClipboardList className="mr-1.5 text-gray-500 text-sm" /> Category
         </label>
@@ -122,7 +123,13 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
 
       {/* Order ID Field (Conditional) */}
       {(formData.category === 'Order Issue' || formData.category === 'Delivery Issue' || formData.category === 'Payment Issue') && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 border border-white/70 shadow-lg animate-fade-in">
+        <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="bg-white/60 backdrop-blur-sm rounded-xl p-3 border border-white/70 shadow-lg"
+        >
           <label htmlFor="orderId" className="block text-gray-700 text-xs sm:text-sm font-medium mb-1 flex items-center">
             <FaHashtag className="mr-1.5 text-gray-500 text-sm" /> Order ID (Optional)
           </label>
@@ -136,7 +143,7 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
             className="w-full p-2 rounded-lg border-2 border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500
                        bg-white shadow-sm focus:shadow-md text-sm sm:text-base"
           />
-        </div>
+        </motion.div>
       )}
 
       {/* Description Field */}
@@ -149,7 +156,7 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
           name="description"
           value={formData.description}
           onChange={handleChange}
-          rows="4" // Reduced rows for compactness
+          rows="4"
           placeholder="Please describe your query in detail..."
           className={`w-full p-2 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base
                       ${errors.description ? 'border-red-500' : 'border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'}
@@ -188,7 +195,7 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
       >
         {isSubmitting ? (
           <>
-            <FaHourglassHalf className="animate-spin mr-2" /> Submitting...
+            <FaSpinner className="animate-spin mr-2" /> Submitting...
           </>
         ) : (
           <>
@@ -201,7 +208,7 @@ const CreateTicketForm = ({ categories, onSubmit, isSubmitting, submitSuccess, e
 };
 
 // --- ViewTicketsList Component ---
-const ViewTicketsList = ({ tickets, onDeleteTicket, currentPage, setCurrentPage, ticketsPerPage }) => {
+const ViewTicketsList = ({ tickets, onDeleteTicket, onSelectTicket, currentPage, setCurrentPage, ticketsPerPage, loading }) => {
   const totalPages = Math.ceil(tickets.length / ticketsPerPage);
   const indexOfLastTicket = currentPage * ticketsPerPage;
   const indexOfFirstTicket = indexOfLastTicket - ticketsPerPage;
@@ -219,37 +226,58 @@ const ViewTicketsList = ({ tickets, onDeleteTicket, currentPage, setCurrentPage,
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-10">
+        <FaSpinner className="animate-spin text-emerald-600 text-3xl" />
+        <p className="ml-3 text-gray-600">Loading tickets...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {currentTickets.length > 0 ? (
-        currentTickets.map(ticket => (
-          <div key={ticket.id} className="bg-white rounded-xl shadow-lg p-2 border border-gray-100 transition-all duration-200 hover:shadow-xl hover:scale-[1.01]">
-            <div className="flex justify-between items-start mb-3"> {/* Changed to items-start for better alignment with delete */}
-              <h3 className="text-md sm:text-lg font-bold text-gray-900 flex items-center">
-                <FaTicketAlt className="mr-2 text-emerald-600 text-lg" /> {ticket.id}
-              </h3>
-              <div className="flex items-center space-x-2">
-                {getStatusBadge(ticket.status)}
-                <button
-                  onClick={() => onDeleteTicket(ticket.id)}
-                  className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors active:scale-95"
-                  aria-label={`Delete ticket ${ticket.id}`}
-                >
-                  <FaTrashAlt className="text-sm" /> {/* Smaller delete icon */}
-                </button>
+        <AnimatePresence>
+          {currentTickets.map(ticket => (
+            <motion.div
+              key={ticket._id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white rounded-xl shadow-lg p-2 border border-gray-100 transition-all duration-200 hover:shadow-xl hover:scale-[1.01]"
+            >
+              <div className="flex justify-between items-start mb-3">
+                <h3 className="text-md sm:text-lg font-bold text-gray-900 flex items-center">
+                  <FaTicketAlt className="mr-2 text-emerald-600 text-lg" /> {ticket.ticketId}
+                </h3>
+                <div className="flex items-center space-x-2">
+                  {getStatusBadge(ticket.status)}
+                  <button
+                    onClick={() => onDeleteTicket(ticket.ticketId)}
+                    className="p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors active:scale-95"
+                    aria-label={`Delete ticket ${ticket.ticketId}`}
+                  >
+                    <FaTrashAlt className="text-sm" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <p className="text-gray-800 font-semibold text-sm sm:text-base mb-1 line-clamp-1">{ticket.subject}</p>
-            <p className="text-gray-600 text-xs mb-2">Category: {ticket.category}</p>
-            <div className="flex justify-between items-center text-gray-500 text-xs">
-              <span>Created: {ticket.date}</span>
-              <span>Last Update: {ticket.lastUpdate}</span>
-            </div>
-            <button className="mt-3 w-full bg-emerald-50 text-emerald-700 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition-colors">
-              View Details
-            </button>
-          </div>
-        ))
+              <p className="text-gray-800 font-semibold text-sm sm:text-base mb-1 line-clamp-1">{ticket.subject}</p>
+              <p className="text-gray-600 text-xs mb-2">Category: {ticket.category}</p>
+              <div className="flex justify-between items-center text-gray-500 text-xs">
+                <span>Created: {new Date(ticket.createdAt).toLocaleDateString()}</span>
+                <span>Last Update: {new Date(ticket.updatedAt).toLocaleDateString()}</span>
+              </div>
+              <button
+                onClick={() => onSelectTicket(ticket.ticketId)}
+                className="mt-3 w-full bg-emerald-50 text-emerald-700 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition-colors"
+              >
+                <FaEye className="inline mr-2" /> View Details
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       ) : (
         <div className="bg-white rounded-xl shadow-lg p-6 text-center text-gray-600 text-sm">
           <p>You haven't created any support tickets yet.</p>
@@ -286,72 +314,179 @@ const ViewTicketsList = ({ tickets, onDeleteTicket, currentPage, setCurrentPage,
   );
 };
 
+// --- TicketDetailView Component ---
+const TicketDetailView = ({ ticket, onClose, onReply, isReplying, currentUserId }) => { // Added currentUserId prop
+  const [replyMessage, setReplyMessage] = useState('');
+
+  const handleReplySubmit = (e) => {
+    e.preventDefault();
+    if (replyMessage.trim()) {
+      onReply(ticket.ticketId, replyMessage);
+      setReplyMessage('');
+    }
+  };
+
+  if (!ticket) {
+    return null;
+  }
+
+  return (
+    <motion.div
+      initial={{ x: '100%', opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: '100%', opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className="absolute inset-0 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-2xl p-4 sm:p-8 md:p-10 z-30 overflow-y-auto"
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 left-4 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+        aria-label="Close ticket details"
+      >
+        <FaChevronLeft className="text-gray-600 text-lg" />
+      </button>
+
+      <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-4 mb-4 text-center">Ticket Details: {ticket.ticketId}</h2>
+
+      <div className="bg-white rounded-xl shadow-lg p-4 mb-4 border border-gray-100">
+        <div className="flex flex-wrap justify-between items-center mb-3">
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-800">{ticket.subject}</h3>
+          {getStatusBadge(ticket.status)}
+        </div>
+        <p className="text-gray-600 text-sm sm:text-base mb-2"><span className="font-medium">Category:</span> {ticket.category}</p>
+        {ticket.orderId && (
+          <p className="text-gray-600 text-sm sm:text-base mb-2"><span className="font-medium">Order ID:</span> {ticket.orderId}</p>
+        )}
+        <p className="text-gray-600 text-sm sm:text-base mb-2"><span className="font-medium">Created:</span> {new Date(ticket.createdAt).toLocaleString()}</p>
+        <p className="text-gray-600 text-sm sm:text-base mb-2"><span className="font-medium">Last Update:</span> {new Date(ticket.updatedAt).toLocaleString()}</p>
+
+        {ticket.assignedToName && (
+            <p className="text-emerald-700 text-sm sm:text-base flex items-center mb-2">
+                <FaUserTie className="mr-2" /> <span className="font-medium">Assigned To:</span> {ticket.assignedToName}
+            </p>
+        )}
+
+        <div className="border-t border-gray-200 pt-3 mt-3">
+          <h4 className="font-semibold text-gray-700 mb-1">Description:</h4>
+          <p className="text-gray-700 text-sm sm:text-base">{ticket.description}</p>
+        </div>
+
+        {ticket.attachment && (
+          <div className="mt-4">
+            <h4 className="font-semibold text-gray-700 mb-1">Attachment:</h4>
+            <a
+              href={`http://localhost:5000${ticket.attachment}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline flex items-center text-sm"
+            >
+              <FaPaperclip className="mr-2" /> View Attachment
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Replies Section */}
+      <div className="bg-white rounded-xl shadow-lg p-4 mb-4 border border-gray-100">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 flex items-center">
+          <FaCommentDots className="mr-2 text-emerald-600" /> Conversation
+        </h3>
+        <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+          {ticket.replies && ticket.replies.length > 0 ? (
+            ticket.replies.map((reply, index) => (
+              // Determine if the reply is from the current buyer
+              <div key={index} className={`p-3 rounded-lg ${reply.userId === currentUserId ? 'bg-blue-50 ml-auto text-right' : 'bg-gray-50 mr-auto text-left'}`}>
+                <p className={`font-semibold text-sm ${reply.userId === currentUserId ? 'text-blue-700' : 'text-gray-800'}`}>
+                  {reply.userId === currentUserId ? (
+                      <FaUser className="inline mr-1" /> // Buyer icon for their own replies
+                  ) : (
+                      <FaUserTie className="inline mr-1" /> // Staff/Admin icon for others' replies
+                  )}
+                  {reply.userId === currentUserId ? 'You' : reply.userName}
+                </p>
+                <p className="text-gray-700 text-sm mt-1">{reply.message}</p>
+                <p className="text-gray-500 text-xs mt-1">{new Date(reply.timestamp).toLocaleString()}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-600 text-sm text-center">No replies yet.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Reply Input */}
+      {ticket.status !== 'Resolved' && ticket.status !== 'Closed' && (
+        <form onSubmit={handleReplySubmit} className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 flex items-center">
+            <FaReply className="mr-2 text-emerald-600" /> Add a Reply
+          </h3>
+          <textarea
+            value={replyMessage}
+            onChange={(e) => setReplyMessage(e.target.value)}
+            rows="3"
+            placeholder="Type your reply here..."
+            className="w-full p-3 rounded-lg border-2 border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500
+                       bg-white shadow-sm resize-y text-sm sm:text-base"
+          ></textarea>
+          <button
+            type="submit"
+            disabled={isReplying || !replyMessage.trim()}
+            className={`mt-3 w-full flex items-center justify-center px-4 py-2.5 rounded-full text-base font-bold
+                        transition-all duration-300 shadow-lg
+                        ${isReplying || !replyMessage.trim() ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-98'}`}
+          >
+            {isReplying ? <><FaSpinner className="animate-spin mr-2" /> Sending...</> : <><FaReply className="mr-2" /> Send Reply</>}
+          </button>
+        </form>
+      )}
+    </motion.div>
+  );
+};
+
+
 // --- Main SupportTicket Component ---
 const SupportTicket = () => {
-  const [activeTab, setActiveTab] = useState('create'); // 'create' or 'view'
+  const [activeTab, setActiveTab] = useState('create');
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errors, setErrors] = useState({});
-  const [tickets, setTickets] = useState([ // Moved mockTickets to state
-    {
-      id: 'TKT001',
-      subject: 'Issue with recent order delivery',
-      category: 'Delivery Issue',
-      status: 'In Progress',
-      date: '2025-07-18',
-      lastUpdate: '2025-07-19',
-    },
-    {
-      id: 'TKT002',
-      subject: 'Query about organic fertilizer usage',
-      category: 'Product Query',
-      status: 'Resolved',
-      date: '2025-07-10',
-      lastUpdate: '2025-07-12',
-    },
-    {
-      id: 'TKT003',
-      subject: 'Payment gateway error on checkout',
-      category: 'Payment Issue',
-      status: 'Open',
-      date: '2025-07-20',
-      lastUpdate: '2025-07-20',
-    },
-    {
-      id: 'TKT004',
-      subject: 'Feedback on website navigation',
-      category: 'Feedback',
-      status: 'Closed',
-      date: '2025-06-30',
-      lastUpdate: '2025-07-05',
-    },
-    {
-      id: 'TKT005',
-      subject: 'Login issue on mobile app',
-      category: 'Technical Support',
-      status: 'Open',
-      date: '2025-07-19',
-      lastUpdate: '2025-07-19',
-    },
-    {
-      id: 'TKT006',
-      subject: 'Question about return policy',
-      category: 'Other',
-      status: 'Open',
-      date: '2025-07-17',
-      lastUpdate: '2025-07-17',
-    },
-    {
-      id: 'TKT007',
-      subject: 'Product availability check',
-      category: 'Product Query',
-      status: 'Resolved',
-      date: '2025-07-15',
-      lastUpdate: '2025-07-16',
-    },
-  ]);
+  const [tickets, setTickets] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const ticketsPerPage = 5;
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [submittingTicket, setSubmittingTicket] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
+  const [selectedTicketDetails, setSelectedTicketDetails] = useState(null);
+  const [loadingTicketDetails, setLoadingTicketDetails] = useState(false);
+  const [isReplying, setIsReplying] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null); // State to store the current authenticated user's ID
 
+  // Get Auth Token - In a real app, this might come from a context/global state
+  const getAuthToken = () => localStorage.getItem('authToken');
+
+  // A dummy function to get current user ID from token
+  // In a real app, you'd decode JWT or have this from your auth context
+  const getUserIdFromToken = () => {
+    const token = getAuthToken();
+    if (token) {
+        try {
+            // This is a VERY simplified way. In production, you'd use a JWT library on the client
+            // to decode the token properly. For now, we just assume a fixed dummy ID for testing.
+            // Replace with actual JWT decoding logic if your token contains user ID.
+            // Example: const decoded = jwt_decode(token); return decoded.user.id;
+            console.warn("Using dummy user ID for frontend reply differentiation. Implement real JWT decode for production.");
+            // For testing: assume a user ID if a token exists
+            return "60c72b1f9b1e8b0015f8a2a0"; // Replace with a real user ID from your DB for testing
+        } catch (e) {
+            console.error("Failed to decode token:", e);
+            return null;
+        }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    setCurrentUserId(getUserIdFromToken());
+  }, []); // Run once on component mount
 
   const categories = [
     { value: '', label: 'Select a category' },
@@ -379,82 +514,238 @@ const SupportTicket = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const fetchTickets = useCallback(async () => {
+    setLoadingTickets(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        console.error("No auth token found. Please log in.");
+        setLoadingTickets(false);
+        return;
+      }
+      const response = await fetch('http://localhost:5000/api/support-tickets', {
+        headers: {
+          'x-auth-token': token,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setTickets(data);
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+    } finally {
+      setLoadingTickets(false);
+    }
+  }, []);
+
+  const fetchTicketDetails = useCallback(async (ticketId) => {
+    setLoadingTicketDetails(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        console.error("No auth token found. Please log in.");
+        setLoadingTicketDetails(false);
+        return;
+      }
+      const response = await fetch(`http://localhost:5000/api/support-tickets/${ticketId}`, {
+        headers: {
+          'x-auth-token': token,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setSelectedTicketDetails(data);
+    } catch (error) {
+      console.error('Error fetching ticket details:', error);
+      setSelectedTicketDetails(null);
+    } finally {
+      setLoadingTicketDetails(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'view' && !selectedTicketId) {
+      fetchTickets();
+    }
+  }, [activeTab, fetchTickets, selectedTicketId]);
+
+  useEffect(() => {
+    if (selectedTicketId) {
+      fetchTicketDetails(selectedTicketId);
+    }
+  }, [selectedTicketId, fetchTicketDetails]);
+
+
   const handleSubmitTicket = async (formDataToSubmit) => {
     if (!validateForm(formDataToSubmit)) {
       return;
     }
 
-    // Simulate API call
-    console.log('Submitting ticket:', formDataToSubmit);
-    // In a real application, you would send formDataToSubmit to your backend here
-    // e.g., await fetch('/api/submit-ticket', { method: 'POST', body: JSON.stringify(formDataToSubmit) });
+    setSubmittingTicket(true);
+    setErrors({});
+    setSubmitSuccess(false);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const formData = new FormData();
+    formData.append('subject', formDataToSubmit.subject);
+    formData.append('category', formDataToSubmit.category);
+    formData.append('description', formDataToSubmit.description);
+    if (formDataToSubmit.orderId) {
+      formData.append('orderId', formDataToSubmit.orderId);
+    }
+    if (formDataToSubmit.attachment) {
+      formData.append('attachment', formDataToSubmit.attachment);
+    }
 
-    // Add new ticket to the list (mocking ID and date)
-    const newTicket = {
-      id: `TKT${String(tickets.length + 1).padStart(3, '0')}`,
-      subject: formDataToSubmit.subject,
-      category: formDataToSubmit.category,
-      status: 'Open', // Default status for new tickets
-      date: new Date().toISOString().slice(0, 10), // Current date
-      lastUpdate: new Date().toISOString().slice(0, 10), // Current date
-    };
-    setTickets(prevTickets => [newTicket, ...prevTickets]); // Add to the beginning of the list
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error("Authentication required. Please log in.");
+      }
 
-    setSubmitSuccess(true);
-    // Optionally switch to 'view' tab after successful submission
-    setActiveTab('view');
-    setCurrentPage(1); // Go to the first page to see the new ticket
-    setTimeout(() => setSubmitSuccess(false), 3000); // Hide success message
-  };
+      const response = await fetch('http://localhost:5000/api/support-tickets', {
+        method: 'POST',
+        headers: {
+          'x-auth-token': token,
+        },
+        body: formData,
+      });
 
-  const handleDeleteTicket = (ticketId) => {
-    // In a real app, you'd send a delete request to your backend
-    console.log(`Deleting ticket: ${ticketId}`);
-    setTickets(prevTickets => prevTickets.filter(ticket => ticket.id !== ticketId));
-    // After deletion, re-evaluate current page to avoid empty page if last item on page was deleted
-    if (currentPage > Math.ceil((tickets.length - 1) / ticketsPerPage) && currentPage > 1) {
-      setCurrentPage(currentPage - 1);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
+      }
+
+      setSubmitSuccess(true);
+      setActiveTab('view');
+      setCurrentPage(1);
+      fetchTickets();
+      setTimeout(() => setSubmitSuccess(false), 3000);
+    } catch (error) {
+      console.error('Error submitting ticket:', error);
+      setErrors({ form: error.message });
+    } finally {
+      setSubmittingTicket(false);
     }
   };
 
+  const handleDeleteTicket = async (ticketId) => {
+    if (!window.confirm(`Are you sure you want to delete ticket ${ticketId}?`)) {
+      return;
+    }
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error("Authentication required. Please log in.");
+      }
+
+      const response = await fetch(`http://localhost:5000/api/support-tickets/${ticketId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-auth-token': token,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
+      }
+
+      console.log(`Ticket ${ticketId} deleted successfully.`);
+      fetchTickets();
+      if (currentPage > Math.ceil((tickets.length - 1) / ticketsPerPage) && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+    } catch (error) {
+      console.error('Error deleting ticket:', error);
+    }
+  };
+
+  const handleReplyToTicket = async (ticketId, message) => {
+    setIsReplying(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error("Authentication required. Please log in.");
+      }
+
+      const response = await fetch(`http://localhost:5000/api/support-tickets/${ticketId}/reply`, {
+        method: 'POST',
+        headers: {
+          'x-auth-token': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
+      }
+
+      const updatedReplies = await response.json();
+      setSelectedTicketDetails(prev => ({
+        ...prev,
+        replies: updatedReplies,
+        updatedAt: new Date().toISOString()
+      }));
+      fetchTickets();
+      console.log('Reply added successfully!');
+    } catch (error) {
+      console.error('Error adding reply:', error);
+    } finally {
+      setIsReplying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 flex items-center justify-center sm:p-2 font-sans">
       <div className="relative bg-white/80 backdrop-blur-xl rounded-[2rem] shadow-2xl p-2 sm:p-8 md:p-10 w-full max-w-2xl border border-white/50">
 
-        {/* Success/Error Message */}
-        {submitSuccess && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full shadow-lg text-sm font-semibold animate-fade-in-down z-20 flex items-center">
-            <FaCheckCircle className="mr-2" /> Ticket Submitted Successfully!
-          </div>
-        )}
-        {Object.keys(errors).length > 0 && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-full shadow-lg text-sm font-semibold animate-fade-in-down z-20 flex items-center">
-            <FaExclamationCircle className="mr-2" /> Please fill in all required fields.
-          </div>
-        )}
+        <AnimatePresence>
+          {submitSuccess && (
+            <motion.div
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              transition={{ duration: 0.3 }}
+              className="absolute top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full shadow-lg text-sm font-semibold z-20 flex items-center"
+            >
+              <FaCheckCircle className="mr-2" /> Ticket Submitted Successfully!
+            </motion.div>
+          )}
+          {errors.form && (
+            <motion.div
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              transition={{ duration: 0.3 }}
+              className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-full shadow-lg text-sm font-semibold z-20 flex items-center"
+            >
+              <FaExclamationCircle className="mr-2" /> {errors.form}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 mt-16"> {/* Reduced mb */}
+        <div className="flex items-center justify-between mb-6 mt-16">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center">
             <FaTicketAlt className="mr-3 text-emerald-600" /> Support
           </h1>
         </div>
 
-        {/* Animated Tabs for Sections */}
         <div className="mb-6 bg-white/60 backdrop-blur-sm rounded-xl p-1 flex border border-white/70 shadow-inner">
           <button
-            onClick={() => { setActiveTab('create'); setErrors({}); }} // Clear errors when switching tabs
+            onClick={() => { setActiveTab('create'); setErrors({}); setSelectedTicketId(null); setSelectedTicketDetails(null); }}
             className={`flex-1 py-2 text-sm sm:text-base font-semibold rounded-lg transition-all duration-300
                         ${activeTab === 'create' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-700 hover:bg-white/70'}`}
           >
             Create Ticket
           </button>
           <button
-            onClick={() => { setActiveTab('view'); setErrors({}); }} // Clear errors when switching tabs
+            onClick={() => { setActiveTab('view'); setErrors({}); setSelectedTicketId(null); setSelectedTicketDetails(null); }}
             className={`flex-1 py-2 text-sm sm:text-base font-semibold rounded-lg transition-all duration-300
                         ${activeTab === 'view' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-700 hover:bg-white/70'}`}
           >
@@ -462,26 +753,51 @@ const SupportTicket = () => {
           </button>
         </div>
 
-        {/* Tab Content */}
-        <div className="p-4 pt-0 rounded-2xl min-h-screen bg-white/60 backdrop-blur-sm border border-white/70 shadow-lg animate-fade-in"> {/* Added padding, rounded */}
+        <div className="p-4 pt-0 rounded-2xl min-h-screen bg-white/60 backdrop-blur-sm border border-white/70 shadow-lg animate-fade-in">
           {activeTab === 'create' && (
             <CreateTicketForm
               categories={categories}
               onSubmit={handleSubmitTicket}
-              isSubmitting={false} // isSubmitting state is managed internally by CreateTicketForm for its button
+              isSubmitting={submittingTicket}
               submitSuccess={submitSuccess}
               errors={errors}
             />
           )}
 
-          {activeTab === 'view' && (
+          {activeTab === 'view' && !selectedTicketId && (
             <ViewTicketsList
               tickets={tickets}
               onDeleteTicket={handleDeleteTicket}
+              onSelectTicket={setSelectedTicketId}
               currentPage={currentPage}
               setCurrentPage={setCurrentPage}
               ticketsPerPage={ticketsPerPage}
+              loading={loadingTickets}
             />
+          )}
+
+          <AnimatePresence>
+            {activeTab === 'view' && selectedTicketId && selectedTicketDetails && (
+              <TicketDetailView
+                ticket={selectedTicketDetails}
+                onClose={() => setSelectedTicketId(null)}
+                onReply={handleReplyToTicket}
+                isReplying={isReplying}
+                currentUserId={currentUserId} // Pass current user ID for reply differentiation
+              />
+            )}
+          </AnimatePresence>
+
+          {activeTab === 'view' && selectedTicketId && loadingTicketDetails && !selectedTicketDetails && (
+             <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-[2rem] z-40">
+                <FaSpinner className="animate-spin text-emerald-600 text-4xl" />
+                <p className="ml-4 text-gray-700">Loading ticket details...</p>
+             </div>
+          )}
+           {activeTab === 'view' && selectedTicketId && !loadingTicketDetails && !selectedTicketDetails && (
+             <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-[2rem] z-40 p-4 text-center">
+                <p className="text-red-600 text-lg">Failed to load ticket details or ticket not found.</p>
+             </div>
           )}
         </div>
 

@@ -16,7 +16,6 @@ const renderStars = (rating) => {
   return <div className="flex text-sm">{stars}</div>;
 };
 
-
 const CartPage = () => {
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
@@ -75,15 +74,22 @@ const CartPage = () => {
         }
       }
       const data = await response.json();
-      setCartItems(data.items.map(item => ({
-        productId: item.productId._id,
-        name: item.productId.name,
-        price: item.productId.price,
-        unit: item.productId.unit,
-        imageUrl: item.productId.imageUrl,
-        quantity: item.quantity,
-        isSelected: item.isSelected !== undefined ? item.isSelected : true
-      })));
+
+      // Filter out items where productId is null (meaning product was not found/deleted)
+      // and then map the remaining valid items.
+      const processedCartItems = data.items
+        .filter(item => item.productId) // Only include items where productId is successfully populated
+        .map(item => ({
+          // Ensure these properties exist on item.productId before accessing
+          productId: item.productId._id,
+          name: item.productId.name,
+          price: item.productId.price,
+          unit: item.productId.unit,
+          imageUrl: item.productId.imageUrl,
+          quantity: item.quantity,
+          isSelected: item.isSelected !== undefined ? item.isSelected : true
+        }));
+      setCartItems(processedCartItems);
     } catch (err) {
       setError(err.message);
       console.error("Error fetching cart:", err);
@@ -160,7 +166,7 @@ const CartPage = () => {
   const handleDeleteItem = async (productId) => {
     const success = await updateCartBackend(`remove/${productId}`, 'DELETE');
     if (success) {
-      showToastMessage('Item removed from cart.', 'error');
+      showToastMessage('Item removed from cart.', 'error'); // Change toast type to indicate removal
     }
   };
 
@@ -184,6 +190,8 @@ const CartPage = () => {
     }
     console.log('Proceeding to checkout with:', selectedItems);
     showToastMessage('Proceeding to checkout! (Simulated)', 'success');
+    // Here you would typically navigate to a checkout page, passing selectedItems
+    // navigate('/checkout', { state: { items: selectedItems, total } });
   };
 
   const toastVariants = {
@@ -203,90 +211,116 @@ const CartPage = () => {
   };
 
   // Cart Item Component for individual items
-  const CartItem = ({ item, onQuantityChange, onDelete, onToggleSelect }) => (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -100, transition: { duration: 0.3, ease: 'easeIn' } }}
-      transition={{ type: "spring", stiffness: 100, damping: 15 }}
-      className="bg-white rounded-2xl shadow-lg p-3 sm:p-5 flex items-center mb-4 border border-gray-100 transform hover:-translate-y-1 hover:shadow-xl transition-all duration-300"
-    >
-      {/* Selection Checkbox */}
-      <motion.button
-        className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 flex items-center justify-center transition-all duration-200 flex-shrink-0 mr-3 sm:mr-4
-          ${item.isSelected ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}
-        onClick={() => onToggleSelect(item.productId)}
-        whileTap={buttonPress}
-        aria-label={item.isSelected ? 'Deselect item' : 'Select item'}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+  const CartItem = ({ item, onQuantityChange, onDelete, onToggleSelect }) => {
+    // Basic check for missing product data, though the filter in fetchCart should prevent this mostly
+    if (!item || !item.productId) {
+      console.warn("Rendering a cart item with missing product data:", item);
+      return (
+        <motion.div
+          key={item?.productId || Math.random()} // Use a fallback key
+          className="bg-red-50 text-red-700 rounded-lg p-4 flex items-center justify-between mb-4 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, x: -100 }}
         >
-          <motion.path
-            d="M5 12L10 17L19 8"
-            stroke="white"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            variants={checkmarkVariants}
-            initial="unchecked"
-            animate={item.isSelected ? "checked" : "unchecked"}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-          />
-        </svg>
-      </motion.button>
-
-      {/* Product Image */}
-      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 mr-3 sm:mr-4 shadow-md border border-gray-100">
-        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-      </div>
-
-      {/* Product Details and Controls */}
-      <div className="flex-grow flex flex-col justify-between">
-        <h3 className="text-base sm:text-lg font-semibold text-gray-800 line-clamp-2">{item.name}</h3>
-        <p className="text-sm sm:text-base font-medium text-gray-500 mb-1 sm:mb-2">₹{(item.price).toFixed(2)} / {item.unit}</p>
-
-        {/* Quantity Controls */}
-        <div className="flex items-center space-x-2 bg-gray-100 rounded-full px-2 py-1">
+          <span>This item is no longer available.</span>
           <motion.button
-            onClick={() => onQuantityChange(item.productId, item.quantity - 1)}
-            className="p-1 rounded-full text-gray-600 hover:text-green-600 transition-colors"
+            onClick={() => onDelete(item._id)} // Pass the cart item _id if needed for backend removal
+            className="p-1 rounded-full bg-red-100 hover:bg-red-200 transition-colors"
             whileTap={buttonPress}
-            aria-label="Decrease quantity"
+            aria-label="Remove unavailable item"
           >
-            <Minus size={18} />
+            <Trash2 size={18} />
           </motion.button>
-          <span className="text-base font-bold text-gray-800 w-6 text-center">{item.quantity}</span>
-          <motion.button
-            onClick={() => onQuantityChange(item.productId, item.quantity + 1)}
-            className="p-1 rounded-full text-gray-600 hover:text-green-600 transition-colors"
-            whileTap={buttonPress}
-            aria-label="Increase quantity"
+        </motion.div>
+      );
+    }
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, x: -100, transition: { duration: 0.3, ease: 'easeIn' } }}
+        transition={{ type: "spring", stiffness: 100, damping: 15 }}
+        className="bg-white rounded-2xl shadow-lg p-3 sm:p-5 flex items-center mb-4 border border-gray-100 transform hover:-translate-y-1 hover:shadow-xl transition-all duration-300"
+      >
+        {/* Selection Checkbox */}
+        <motion.button
+          className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 flex items-center justify-center transition-all duration-200 flex-shrink-0 mr-3 sm:mr-4
+            ${item.isSelected ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}
+          onClick={() => onToggleSelect(item.productId)}
+          whileTap={buttonPress}
+          aria-label={item.isSelected ? 'Deselect item' : 'Select item'}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <Plus size={18} />
+            <motion.path
+              d="M5 12L10 17L19 8"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              variants={checkmarkVariants}
+              initial="unchecked"
+              animate={item.isSelected ? "checked" : "unchecked"}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            />
+          </svg>
+        </motion.button>
+
+        {/* Product Image */}
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 mr-3 sm:mr-4 shadow-md border border-gray-100">
+          <img src={item.imageUrl || 'https://placehold.co/100x100?text=Product'} alt={item.name} className="w-full h-full object-cover" />
+        </div>
+
+        {/* Product Details and Controls */}
+        <div className="flex-grow flex flex-col justify-between">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 line-clamp-2">{item.name}</h3>
+          <p className="text-sm sm:text-base font-medium text-gray-500 mb-1 sm:mb-2">₹{(item.price).toFixed(2)} / {item.unit}</p>
+
+          {/* Quantity Controls */}
+          <div className="flex items-center space-x-2 bg-gray-100 rounded-full px-2 py-1">
+            <motion.button
+              onClick={() => onQuantityChange(item.productId, item.quantity - 1)}
+              className="p-1 rounded-full text-gray-600 hover:text-green-600 transition-colors"
+              whileTap={buttonPress}
+              aria-label="Decrease quantity"
+            >
+              <Minus size={18} />
+            </motion.button>
+            <span className="text-base font-bold text-gray-800 w-6 text-center">{item.quantity}</span>
+            <motion.button
+              onClick={() => onQuantityChange(item.productId, item.quantity + 1)}
+              className="p-1 rounded-full text-gray-600 hover:text-green-600 transition-colors"
+              whileTap={buttonPress}
+              aria-label="Increase quantity"
+            >
+              <Plus size={18} />
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Item Total and Delete Button */}
+        <div className="flex flex-col items-end justify-between ml-3 sm:ml-4 flex-shrink-0">
+          <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">₹{(item.price * item.quantity).toFixed(2)}</p>
+          <motion.button
+            onClick={() => onDelete(item.productId)}
+            className="p-1 sm:p-2 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+            whileTap={buttonPress}
+            aria-label="Delete item"
+          >
+            <Trash2 size={18} className="text-red-500" />
           </motion.button>
         </div>
-      </div>
+      </motion.div>
+    );
+  };
 
-      {/* Item Total and Delete Button */}
-      <div className="flex flex-col items-end justify-between ml-3 sm:ml-4 flex-shrink-0">
-        <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">₹{(item.price * item.quantity).toFixed(2)}</p>
-        <motion.button
-          onClick={() => onDelete(item.productId)}
-          className="p-1 sm:p-2 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
-          whileTap={buttonPress}
-          aria-label="Delete item"
-        >
-          <Trash2 size={18} className="text-red-500" />
-        </motion.button>
-      </div>
-    </motion.div>
-  );
 
   if (loading) {
     return (
