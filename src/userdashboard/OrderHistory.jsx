@@ -16,7 +16,7 @@ const OrderHistory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeStatusFilter, setActiveStatusFilter] = useState('All');
   const [showDownloadMessage, setShowDownloadMessage] = useState(false);
-
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
   // Fetch data on component mount
   useEffect(() => {
     const fetchOrderHistory = async () => {
@@ -31,10 +31,10 @@ const OrderHistory = () => {
       try {
         // Fetch both profile and orders in parallel for efficiency
         const [profileRes, ordersRes] = await Promise.all([
-          fetch('http://localhost:5000/api/profile', {
+          fetch(`${API_BASE_URL}/profile`, {
             headers: { 'x-auth-token': token },
           }),
-          fetch('http://localhost:5000/api/orders', {
+          fetch(`${API_BASE_URL}/orders`, {
             headers: { 'x-auth-token': token },
           }),
         ]);

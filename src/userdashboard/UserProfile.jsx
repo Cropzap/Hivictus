@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'; // Added useCal
 import { FaEdit, FaSave, FaTimes, FaCamera, FaUserCircle, FaPhone, FaEnvelope, FaMapMarkerAlt, FaCalendarAlt, FaVenusMars, FaBuilding, FaBriefcase, FaHome } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader } from 'lucide-react'; // Corrected: Added Loader import
-
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
 // --- START: Move InputField OUTSIDE UserProfile component ---
 const InputField = ({ label, name, value, type = 'text', readOnly = false, icon: Icon, options, onChange }) => (
   <div className="mb-2">
@@ -125,7 +125,7 @@ const UserProfile = () => {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/profile', {
+        const response = await fetch(`${API_BASE_URL}/profile`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -193,7 +193,7 @@ const UserProfile = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/profile', {
+      const response = await fetch(`${API_BASE_URL}/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

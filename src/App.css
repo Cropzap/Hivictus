@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Add this CSS to your stylesheet */
+@media (max-width: 639px) { /* Tailored for mobile view (up to sm breakpoint) */
+  .mobile-scroll-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 1.5rem; /* Matches the gap-6 from Tailwind */
+    padding-bottom: 1rem;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+
+  .mobile-scroll-container > * {
+    min-width: calc(50% - 0.75rem); /* Show at least two cards at once */
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+}

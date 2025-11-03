@@ -1,93 +1,176 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  FaStar, FaStarHalfAlt, FaRegStar,
-  FaShoppingCart, FaFilter, FaRedo, FaSearch, FaTimes
-} from 'react-icons/fa';
-import { Loader, CheckCircle } from 'lucide-react'; // For loading indicator and success icon
+  Star,
+  ShoppingCart,
+  Filter,
+  RefreshCcw,
+  Search,
+  X,
+  User,
+  Loader,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css'; // Import toast styles
 
-// Star Rendering Component - Improved for professional look
-const renderStars = (rating) => {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    if (rating >= i) stars.push(<FaStar key={i} className="text-yellow-500" />); // Brighter yellow
-    else if (rating >= i - 0.5) stars.push(<FaStarHalfAlt key={i} className="text-yellow-500" />);
-    else stars.push(<FaRegStar key={i} className="text-gray-400" />); // Slightly darker gray for contrast
-  }
-  return <div className="flex text-xs sm:text-sm gap-0.5">{stars}</div>; // Added gap for spacing
+// API Base URL (Configure this based on your backend environment)
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+// ====================================================================
+// --- Utility Functions for URL Slugs ---
+// ====================================================================
+
+/**
+ * Converts a clean string (e.g., "Fresh Vegetables") into a URL slug (e.g., "fresh-vegetables").
+ * @param {string} name - The category or subcategory name.
+ * @returns {string | null} The slug, or null if the name is falsy or 'All'.
+ */
+const createSlug = (name) => {
+  if (!name || name === 'All') return null;
+  // Replaces spaces with hyphens, converts to lowercase, and removes non-alphanumeric characters (except hyphens)
+  return name.toLowerCase().replace(/\s/g, '-').replace(/[^a-z0-9-]/g, '');
 };
 
-// Product Card UI Component - Significantly improved UI and spacing
-const ProductCard = ({ product, showToastMessage }) => { // Accept showToastMessage prop
-  const navigate = useNavigate();
+/**
+ * Converts a URL slug (e.g., "fresh-vegetables") back into a clean name (e.g., "Fresh Vegetables").
+ * This is the value used for UI display and filtering logic against product data.
+ * @param {string} slug - The URL slug.
+ * @returns {string} The clean name with capitalized words and spaces, or 'All' if the slug is falsy.
+ */
+const cleanName = (slug) => {
+  if (!slug) return 'All';
+  // Replace hyphens with spaces and capitalize each word
+  return slug
+    .replace(/-/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+/**
+ * Normalizes a category or subcategory name by converting hyphens to spaces and trimming.
+ * Used for safe comparison between filter values (which might be clean names) and product data.
+ * @param {string} name - The category or subcategory name (can be from product data or a filter).
+ * @returns {string} The normalized name for filtering, or 'All' if the name is falsy or 'All'.
+ */
+const normalizeFilterName = (name) => {
+  if (!name || name === 'All') return 'All';
+  // Replace all hyphens with a space and trim any extra whitespace
+  return name.replace(/-/g, ' ').trim();
+};
+
+// ====================================================================
+// --- Utility Components (ProductCard, PriceUnit, etc.) ---
+// ====================================================================
+
+// Star Rendering Component (Reduced size to 10)
+const renderStars = (rating) => {
+  const stars = [];
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 !== 0;
+
+  for (let i = 0; i < fullStars; i++) {
+    stars.push(<Star key={`full-${i}`} size={10} fill="#FACC15" color="#FACC15" />);
+  }
+  if (hasHalfStar) {
+    stars.push(<Star key="half" size={10} fill="#FACC15" color="#FACC15" opacity={0.5} />);
+  }
+  const emptyStars = 5 - stars.length;
+  for (let i = 0; i < emptyStars; i++) {
+    stars.push(<Star key={`empty-${i}`} size={10} color="#D1D5DB" />);
+  }
+  return <div className="flex items-center gap-0.5">{stars}</div>;
+};
+
+// Price & Unit Component
+const PriceUnit = ({ price, unit }) => {
+  const numericPrice = typeof price === 'number' ? price : 0;
+
+  const formattedPrice = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+  }).format(numericPrice);
+
+  return (
+    <div className="flex items-end text-sm">
+      <span className="text-lg font-extrabold text-green-700">
+        {formattedPrice}
+      </span>
+      {unit && (
+        <span className="text-xs text-gray-500 font-medium capitalize ml-1 whitespace-nowrap">
+          / {unit}
+        </span>
+      )}
+    </div>
+  );
+};
+
+// --- Product Card UI Component ---
+const ProductCard = ({ product }) => {
   const [authToken, setAuthToken] = useState(null);
 
-  // Fetch auth token from localStorage on component mount
   useEffect(() => {
-    const token = localStorage.getItem('authToken'); // Assuming 'authToken' for buyers
+    const token = localStorage.getItem('authToken');
     if (token) {
       setAuthToken(token);
     }
   }, []);
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: {
-      opacity: 1, y: 0,
-      transition: { type: 'spring', stiffness: 100, damping: 10 },
-    },
-    hover: {
-      scale: 1.03,
-      y: -4, // Slight lift effect on hover
-      boxShadow: "0 15px 25px -5px rgba(0, 0, 0, 0.15), 0 6px 10px -3px rgba(0, 0, 0, 0.08)", // More pronounced shadow
-      transition: { duration: 0.3 },
-    },
-    tap: { scale: 0.98 },
-  };
-
   const handleAddToCart = async (e) => {
-    e.preventDefault(); // Prevent navigating to product details page
-    e.stopPropagation(); // Stop event propagation to the Link
+    e.preventDefault();
+    e.stopPropagation();
 
     if (!authToken) {
-      showToastMessage('Please log in to add items to cart.', 'error');
-      navigate('/login'); // Redirect to login if not authenticated
+      toast.error('Please log in to add items to cart.');
       return;
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/cart/add', {
+      const response = await fetch(`${API_BASE_URL}/cart/add`, {
         method: 'POST',
         headers: {
-          'x-auth-token': authToken, // This sends the buyer's authentication token
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ productId: product._id, quantity: 1 }), // Add 1 quantity by default
+        body: JSON.stringify({ productId: product._id, quantity: 1 }),
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          showToastMessage('Session expired. Please log in again.', 'error');
-          localStorage.removeItem('authToken'); // Clear invalid token
-          localStorage.removeItem('userData'); // Assuming buyer's user data is stored here
-          navigate('/login'); // Redirect to login
-        } else {
-          const errorData = await response.json();
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
+        // Attempt to read error message from response body
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add item to cart.');
       }
 
-      showToastMessage(`${product.name} added to cart!`);
+      toast.success(`${product.name} added to cart!`);
+
     } catch (err) {
-      console.error("Error adding to cart from ProductCard:", err);
-      showToastMessage(`Failed to add to cart: ${err.message}`, 'error');
+      console.error('Error adding to cart from ProductCard:', err);
+      toast.error(`Failed to add to cart: ${err.message || 'Server error'}`);
     }
   };
 
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100, damping: 10 } },
+    hover: { scale: 1.03, y: -3, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' },
+    tap: { scale: 0.99 },
+  };
+
+  const isOutOfStock = product.quantity === 0;
+
+  // Truncate description to 30 characters
+  const shortDescription = product.description
+    ? (product.description.length > 30
+      ? product.description.substring(0, 30) + '...'
+      : product.description)
+    : 'Fresh and organic produce';
+
   return (
     <motion.div
-      className="relative bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-300 flex flex-col border border-gray-100 group" // Added group for outer card hover effects
+      className="relative bg-white rounded-xl shadow-lg transition-all duration-300 flex flex-col group border border-gray-100 hover:border-green-400 h-96"
       variants={cardVariants}
       initial="hidden"
       animate="visible"
@@ -95,242 +178,392 @@ const ProductCard = ({ product, showToastMessage }) => { // Accept showToastMess
       whileTap="tap"
     >
       <Link to={`/product/${product._id}`} className="flex flex-col h-full">
-        <div className="relative w-full h-40 sm:h-52 bg-gray-100 flex items-center justify-center overflow-hidden">
+        {/* Product Image */}
+        <div className="relative w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden">
           <img
-            src={product.imageUrl || 'https://placehold.co/400x400/E0E0E0/333333?text=Product'} // Fallback for image
+            src={product.imageUrl || 'https://placehold.co/400x400/E5E7EB/9CA3AF?text=Product'}
             alt={product.name}
-            className="object-cover h-full w-full transition-transform duration-300 ease-out group-hover:scale-105"
-            onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x400/E0E0E0/333333?text=Product'; }}
+            className="object-cover w-full h-full transition-transform duration-500 ease-out group-hover:scale-110"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = 'https://placehold.co/400x400/E5E7EB/9CA3AF?text=Product';
+            }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          {/* Out of Stock Badge */}
+          {isOutOfStock && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-md z-10">
+              OOS
+            </div>
+          )}
         </div>
-        <div className="p-4 sm:p-5 flex flex-col flex-grow"> {/* Increased padding slightly */}
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-800 line-clamp-2 mb-1.5"> {/* Adjusted mb */}
+
+        {/* Product Details */}
+        <div className="p-4 flex flex-col flex-grow text-xs">
+          {/* Name - Reduced to text-base */}
+          <h3 className="font-extrabold text-gray-800 line-clamp-2 mb-1 text-base leading-tight">
             {product.name}
           </h3>
-          <p className="text-xs text-gray-500 mb-2.5"> {/* Adjusted mb */}
-            {product.category?.name} &bull; {product.subCategory} &bull; {product.type}
-          </p>
-          {/* <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-            {product.description}
-          </p> */}
 
-          <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
-            <span className="text-lg sm:text-xl text-green-700 font-bold">₹{product.price.toFixed(2)} / {product.unit}</span>
-            {/* Rating Display - New Curvy Design */}
-            <div className="flex items-center bg-lime-100 text-lime-800 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm">
-              <span className="mr-1">{product.rating.toFixed(1)}</span>
-              {renderStars(product.rating)}
+          {/* Price & Unit (One Line) - Prominent placement */}
+          <div className="flex items-center justify-between mb-2">
+            <PriceUnit price={product.price} unit={product.unit} />
+          </div>
+
+          {/* Short Description & Rating (One Line) */}
+          <div className="flex items-center justify-between text-gray-600 mb-2 border-t pt-2 border-gray-100">
+            <p className="text-gray-500 line-clamp-1 text-xs" title={product.description}>{shortDescription}</p>
+            {/* Rating Display */}
+            <div className="flex items-center gap-1 text-xs font-semibold whitespace-nowrap">
+              <Star size={12} fill="#FACC15" color="#FACC15" />
+              <span className="text-gray-700">{product.rating ? product.rating.toFixed(1) : 'N/A'}</span>
             </div>
           </div>
 
-          <div className="flex justify-between items-center mt-2"> {/* Maintained mt */}
-            {product.quantity > 0 ? (
-              <p className="text-sm text-gray-500 font-medium">In Stock: <span className="text-green-600">{product.quantity}</span></p>
-            ) : (
-              <p className="text-sm text-red-500 font-semibold">Out of Stock</p>
-            )}
-            <p className="text-xs text-gray-700 font-bold">Sold by: {product.sellerName}</p>
+          {/* Seller Info and Review Count (Bottom) - Smaller text */}
+          <div className="flex items-center justify-between text-gray-600 mt-auto text-[10px]">
+            <div className="flex items-center">
+              <User className="mr-1 text-green-400" size={10} />
+              <span className="font-medium line-clamp-1 text-gray-700">
+                {product.sellerName || 'Local Farm'}
+              </span>
+            </div>
+            <span className="text-gray-500">
+              ({product.reviewCount || 0} reviews)
+            </span>
           </div>
         </div>
       </Link>
-      {/* Cart Button */}
-      <div className="absolute top-3 right-3">
+
+      {/* Add to Cart Button (Fixed at bottom) */}
+      <div className="p-4 pt-0">
         <motion.button
-          className={`bg-white p-2.5 rounded-full shadow-lg transition-colors duration-200
-                      ${product.quantity === 0 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-green-100 text-green-600 hover:text-green-700'}`}
-          title={product.quantity === 0 ? "Out of Stock" : "Add to Cart"}
-          whileHover={{ scale: 1.15 }}
-          whileTap={{ scale: 0.9 }}
+          className={`w-full py-2.5 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-300 shadow-md
+            ${isOutOfStock
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
+          title={isOutOfStock ? 'Out of Stock' : 'Add to Basket'}
+          whileHover={{ scale: isOutOfStock ? 1 : 1.02 }}
+          whileTap={{ scale: isOutOfStock ? 1 : 0.98 }}
           onClick={handleAddToCart}
-          disabled={product.quantity === 0}
+          disabled={isOutOfStock}
         >
-          <FaShoppingCart className="w-5 h-5" />
+          {isOutOfStock ? (
+            'Out of Stock'
+          ) : (
+            <>
+              <ShoppingCart size={16} className="mr-2" /> Add to Basket
+            </>
+          )}
         </motion.button>
       </div>
     </motion.div>
   );
 };
 
-// Common Filter UI Component (reused for both desktop and mobile)
-const FilterContent = ({ handleFilterChange, handlePriceRangeChange, resetFilters, filters, allCategories, allTypes, allRatings, getSubcategoriesForSelectedCategory }) => (
-  <>
-    {/* Search Input */}
-    <div className="mb-6 border-b border-gray-200 pb-6">
-      <label htmlFor="searchQuery" className="block text-gray-700 text-sm font-semibold mb-2">Search Products</label>
-      <div className="relative">
-        <input
-          type="text"
-          id="searchQuery"
-          name="searchQuery"
-          value={filters.searchQuery}
-          onChange={handleFilterChange}
-          placeholder="e.g., tomato, organic, apple"
-          className="w-full p-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
-        />
-        <FaSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+// --- Common Filter UI Component (Refined) ---
+const FilterContent = ({
+  handleFilterChange,
+  handlePriceRangeChange,
+  resetFilters,
+  filters,
+  allCategories,
+  allTypes,
+  getSubcategoriesForSelectedCategory,
+}) => {
+
+    const maxPrice = filters.priceRange[1] > filters.priceRange[0] ? filters.priceRange[1] : filters.priceRange[0];
+    const minPrice = filters.priceRange[0];
+
+    return (
+    <>
+      <div className="mb-4 p-3 bg-white rounded-lg shadow-inner">
+        <label htmlFor="searchQuery" className="block text-gray-700 text-xs font-semibold mb-1">
+          Quick Search
+        </label>
+        <div className="relative">
+          <input
+            type="text"
+            id="searchQuery"
+            name="searchQuery"
+            value={filters.searchQuery}
+            onChange={handleFilterChange}
+            placeholder="e.g., tomato, organic"
+            className="w-full p-2 pr-8 border border-gray-200 rounded-lg focus:border-green-400 focus:ring-green-400 transition-all text-sm"
+          />
+          <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+        </div>
       </div>
-    </div>
 
-    {/* Category Filter */}
-    <div className="mb-6 border-b border-gray-200 pb-6">
-      <label htmlFor="category" className="block text-gray-700 text-sm font-semibold mb-2">Category</label>
-      <select
-        id="category"
-        name="category"
-        value={filters.category}
-        onChange={handleFilterChange}
-        className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
-      >
-        {allCategories.map(cat => (
-          <option key={cat} value={cat}>{cat}</option>
-        ))}
-      </select>
-    </div>
-
-    {/* SubCategory Filter (Conditional based on selected Category) */}
-    {filters.category !== 'All' && (
-      <div className="mb-6 border-b border-gray-200 pb-6">
-        <label htmlFor="subCategory" className="block text-gray-700 text-sm font-semibold mb-2">Subcategory</label>
+      <div className="mb-4">
+        <label htmlFor="category" className="block text-gray-700 text-xs font-semibold mb-1">
+          Category
+        </label>
+        {/* Note: The value passed here is the CLEAN NAME, not the slug */}
         <select
-          id="subCategory"
-          name="subCategory"
-          value={filters.subCategory}
+          id="category"
+          name="category"
+          value={filters.category}
           onChange={handleFilterChange}
-          className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
+          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
         >
-          {getSubcategoriesForSelectedCategory().map(subCat => (
-            <option key={subCat} value={subCat}>{subCat}</option>
+          {['All', ...allCategories.map(c => c.name)].map((cat) => (
+            <option key={cat} value={cat} className="text-sm">
+              {cat}
+            </option>
           ))}
         </select>
       </div>
-    )}
 
-    {/* Type Filter (Organic/Conventional) */}
-    <div className="mb-6 border-b border-gray-200 pb-6">
-      <label htmlFor="type" className="block text-gray-700 text-sm font-semibold mb-2">Produce Type</label>
-      <select
-        id="type"
-        name="type"
-        value={filters.type}
-        onChange={handleFilterChange}
-        className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
-      >
-        {allTypes.map(type => (
-          <option key={type} value={type}>{type}</option>
-        ))}
-      </select>
-    </div>
+      {filters.category !== 'All' && (
+        <div className="mb-4">
+          <label htmlFor="subCategory" className="block text-gray-700 text-xs font-semibold mb-1">
+            Subcategory
+          </label>
+            {/* Note: The value passed here is the CLEAN NAME, not the slug */}
+          <select
+            id="subCategory"
+            name="subCategory"
+            value={filters.subCategory}
+            onChange={handleFilterChange}
+            className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+          >
+            {getSubcategoriesForSelectedCategory().map((subCat) => (
+              <option key={subCat} value={subCat} className="text-sm">
+                {subCat}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-    {/* Price Range Filter */}
-    <div className="mb-6 border-b border-gray-200 pb-6">
-      <label className="block text-gray-700 text-sm font-semibold mb-2">Price Range (per unit)</label>
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          name="minPrice"
-          value={filters.priceRange[0]}
-          onChange={handlePriceRangeChange}
-          placeholder="Min"
-          step="0.01"
-          min="0"
-          max="100" // Consider adjusting max value based on your actual product prices
-          className="w-1/2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
-        />
-        <span className="text-gray-500">-</span>
-        <input
-          type="number"
-          name="maxPrice"
-          value={filters.priceRange[1]}
-          onChange={handlePriceRangeChange}
-          placeholder="Max"
-          step="0.01"
-          min="0"
-          max="100" // Consider adjusting max value based on your actual product prices
-          className="w-1/2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
-        />
+      <div className="mb-4">
+        <label htmlFor="type" className="block text-gray-700 text-xs font-semibold mb-1">
+          Produce Type
+        </label>
+        <select
+          id="type"
+          name="type"
+          value={filters.type}
+          onChange={handleFilterChange}
+          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+        >
+          {allTypes.map((type) => (
+            <option key={type} value={type} className="text-sm">
+              {type}
+            </option>
+          ))}
+        </select>
       </div>
-      <span className="text-xs text-gray-500 mt-2 block">
-        ₹{filters.priceRange[0].toFixed(2)} - ₹{filters.priceRange[1].toFixed(2)}
-      </span>
-    </div>
 
-    {/* Rating Filter */}
-    <div className="mb-6 border-b border-gray-200 pb-6">
-      <label htmlFor="minRating" className="block text-gray-700 text-sm font-semibold mb-2">Minimum Rating</label>
-      <select
-        id="minRating"
-        name="minRating"
-        value={filters.minRating}
-        onChange={handleFilterChange}
-        className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
+      <div className="mb-4">
+        <label className="block text-gray-700 text-xs font-semibold mb-1">
+          Price Range (INR)
+        </label>
+        <div className="flex items-center gap-2">
+            <input
+              type="number"
+              name="minPrice"
+              value={minPrice}
+              onChange={handlePriceRangeChange}
+              placeholder="Min"
+              step="1"
+              min="0"
+              className="w-1/2 p-2 border border-gray-200 rounded-lg focus:border-green-400 transition-all text-sm"
+            />
+            <span className="text-gray-500 font-bold text-sm">-</span>
+            <input
+              type="number"
+              name="maxPrice"
+              value={maxPrice}
+              onChange={handlePriceRangeChange}
+              placeholder="Max"
+              step="1"
+              min="0"
+              className="w-1/2 p-2 border border-gray-200 rounded-lg focus:border-green-400 transition-all text-sm"
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Range: ₹{minPrice} - ₹{maxPrice}</p>
+      </div>
+
+      <div className="mb-5">
+        <label htmlFor="sortBy" className="block text-gray-700 text-xs font-semibold mb-1">
+          Sort By
+        </label>
+        <select
+          id="sortBy"
+          name="sortBy"
+          value={filters.sortBy}
+          onChange={handleFilterChange}
+          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+        >
+          <option value="default">Best Match</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="rating-desc">Rating: High to Low</option>
+        </select>
+      </div>
+
+      <button
+        onClick={resetFilters}
+        className="w-full bg-red-500 text-white px-3 py-2 rounded-lg flex items-center justify-center font-bold text-sm shadow-md hover:bg-red-600 transition-colors mt-3"
       >
-        <option value={0}>Any Rating</option>
-        {allRatings.map(rating => (
-          <option key={rating} value={rating}>{rating} Stars & Up</option>
-        ))}
-      </select>
+        <RefreshCcw className="mr-2" size={14} /> Reset Filters
+      </button>
+    </>
+  )
+};
+
+// --- Categories Bar Component (Scrollable and Animated) ---
+const CategoriesBar = ({ categories, onSelect, selectedCategory }) => {
+  const scrollRef = useRef(null);
+
+  const allCategory = { name: 'All', mainImage: 'https://placehold.co/100x100/F0FDF4/15803D?text=All' };
+  // The 'categories' prop is expected to be an array of category objects from the backend.
+  const allCategoriesList = [allCategory, ...categories];
+
+  const scroll = (direction) => {
+    if (scrollRef.current) {
+      // Scroll by 200px horizontally with smooth animation
+      const scrollAmount = direction === 'left' ? -200 : 200;
+      scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <div className="relative py-2 group">
+
+        {/* Scroll Left Button */}
+        <motion.button
+            onClick={() => scroll('left')}
+            className="absolute left-[-10px] top-1/2 -translate-y-1/2 z-20 p-2 bg-white rounded-full shadow-lg border border-gray-200 transition-all duration-300 opacity-0 group-hover:opacity-100 hover:bg-green-100 hidden md:block"
+            whileHover={{ scale: 1.1 }}
+            title="Scroll Left"
+        >
+            <ChevronLeft size={16} className="text-green-600" />
+        </motion.button>
+
+        {/* Categories Scroller */}
+        <div
+            ref={scrollRef}
+            className="overflow-x-auto whitespace-nowrap scrollbar-hide py-1 px-1"
+            style={{ scrollBehavior: 'smooth' }}
+        >
+            <div className="inline-flex gap-4">
+                {allCategoriesList.map((category, index) => (
+                    <motion.div
+                        key={index}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                        className={`flex flex-col items-center cursor-pointer p-1 rounded-xl transition-all duration-300 hover:bg-green-50/50 hover:shadow-sm min-w-[70px]
+                          ${selectedCategory === category.name
+                            ? 'bg-green-100 border-2 border-green-600 text-green-700 font-extrabold shadow-inner'
+                            : 'text-gray-700 border-2 border-transparent'}`
+                        }
+                        onClick={() => onSelect(category.name)}
+                    >
+                        <div className="w-14 h-14 rounded-full overflow-hidden border border-gray-200 transition-all duration-300 hover:shadow-lg">
+                            <img
+                                src={category.mainImage || 'https://placehold.co/100x100/E5E7EB/6B7280?text=Cat'}
+                                alt={category.name}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                        </div>
+                        <span className="mt-1 text-xs font-semibold capitalize whitespace-nowrap">
+                            {category.name}
+                        </span>
+                    </motion.div>
+                ))}
+            </div>
+        </div>
+
+        {/* Scroll Right Button */}
+        <motion.button
+            onClick={() => scroll('right')}
+            className="absolute right-[-10px] top-1/2 -translate-y-1/2 z-20 p-2 bg-white rounded-full shadow-lg border border-gray-200 transition-all duration-300 opacity-0 group-hover:opacity-100 hover:bg-green-100 hidden md:block"
+            whileHover={{ scale: 1.1 }}
+            title="Scroll Right"
+        >
+            <ChevronRight size={16} className="text-green-600" />
+        </motion.button>
+
     </div>
+  );
+};
 
-    {/* Sort By */}
-    <div className="mb-8">
-      <label htmlFor="sortBy" className="block text-gray-700 text-sm font-semibold mb-2">Sort By</label>
-      <select
-        id="sortBy"
-        name="sortBy"
-        value={filters.sortBy}
-        onChange={handleFilterChange}
-        className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 text-gray-800"
-      >
-        <option value="default">Default</option>
-        <option value="price-asc">Price: Low to High</option>
-        <option value="price-desc">Price: High to Low</option>
-        <option value="rating-desc">Rating: High to Low</option>
-      </select>
-    </div>
 
-    {/* Reset Filters Button */}
-    <button
-      onClick={resetFilters}
-      className="w-full bg-lime-100 text-lime-700 px-4 py-3 rounded-lg flex items-center justify-center
-                 shadow-sm hover:bg-lime-200 transition-colors duration-300 font-semibold border border-lime-300"
-    >
-      <FaRedo className="mr-2" /> Reset Filters
-    </button>
-  </>
-);
+// ====================================================================
+// --- Main Products Component ---
+// ====================================================================
 
-// Main Products Component
 const Products = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [allProducts, setAllProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const [allCategories, setAllCategories] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [allTypes, setAllTypes] = useState([]);
-  const allRatings = [5, 4, 3];
 
-  const [filters, setFilters] = useState({
-    category: 'All',
-    subCategory: 'All',
+  const [localFilters, setLocalFilters] = useState({
     type: 'All',
-    priceRange: [0, 100], // Default max price might need adjustment based on data
-    minRating: 0,
+    // priceRange initialized with a safe default, max will be set after fetch
+    priceRange: [0, 100],
+    minRating: 0, // Not currently used in FilterContent/applyFilters but kept for future use
     searchQuery: '',
     sortBy: 'default',
   });
 
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState('success');
 
-  const showToastMessage = useCallback((message, type = 'success') => {
-    setToastMessage(message);
-    setToastType(type);
-    setTimeout(() => setToastMessage(''), 3000);
+  // --- Dynamic URL Derived Filters ---
+  // The cleanName function converts the URL slug back to the name with spaces (e.g., 'Fresh Vegetables')
+  const categoryFromUrl = cleanName(searchParams.get('category'));
+  const subCategoryFromUrl = cleanName(searchParams.get('subcategory'));
+
+  const currentFilters = useMemo(() => ({
+    ...localFilters,
+    // These values are derived from URL slugs, but are the CLEAN NAMEs with spaces
+    category: categoryFromUrl,
+    subCategory: subCategoryFromUrl,
+  }), [localFilters, categoryFromUrl, subCategoryFromUrl]);
+  // ------------------------------------
+
+  // Memoized list of all unique category names (including 'All') for dropdown/bar
+  const allCategoryNames = useMemo(() => {
+    return ['All', ...categories.map(c => c.name)];
+  }, [categories]);
+
+
+  // Helper to get subcategories for the currently selected main category
+  const getSubcategoriesForSelectedCategory = useCallback(() => {
+    const selectedCat = categories.find(c => c.name === currentFilters.category);
+    if (selectedCat && selectedCat.subcategories) {
+      // Assuming subcategory names in the product data match the names in the category data
+      return ['All', ...selectedCat.subcategories.map(sc => sc.name)];
+    }
+    return ['All'];
+  }, [categories, currentFilters.category]);
+
+
+  // Fetch categories from backend
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const data = await response.json();
+        setCategories(data);
+      } catch (err) {
+        console.error('Error fetching categories:', err.message);
+      }
+    };
+    fetchCategories();
   }, []);
-
 
   // Fetch products from backend
   useEffect(() => {
@@ -338,291 +571,365 @@ const Products = () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch('http://localhost:5000/api/products');
+        const response = await fetch(`${API_BASE_URL}/products`);
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`HTTP error! Status: ${response.status}`);
         }
-        const data = await response.json();
-        // Add dummy sellerName and rating for UI purposes if not present
-        const productsWithParsedData = data.map(p => ({
+        const rawData = await response.json();
+
+        const productsWithParsedData = rawData.map((p) => ({
           ...p,
-          // Ensure sellerName is correctly pulled from populated sellerId
-          sellerName: p.sellerId?.sellerName || p.sellerId?.companyName || 'Unknown Seller',
-          rating: p.rating !== undefined ? p.rating : parseFloat((Math.random() * 5).toFixed(1)), // Add dummy rating if missing
+          // Safely access seller name
+          sellerName: p.sellerId?.sellerName || p.sellerId?.companyName || 'Local Farm',
+          // Ensure rating and reviewCount are numbers
+          rating: p.rating !== undefined ? parseFloat(p.rating) : 5.0,
+          reviewCount: p.reviewCount !== undefined ? parseInt(p.reviewCount, 10) : 0,
+          // Ensure category is an object with a name property
+          category: p.category && typeof p.category === 'object' ? p.category : { name: 'Unknown' },
         }));
 
         setAllProducts(productsWithParsedData);
-        setFilteredProducts(productsWithParsedData);
 
-        const uniqueCategories = ['All', ...new Set(productsWithParsedData.map(p => p.category?.name).filter(Boolean))];
-        const uniqueTypes = ['All', ...new Set(productsWithParsedData.map(p => p.type).filter(Boolean))];
-        setAllCategories(uniqueCategories);
+        // Determine the maximum price for the initial price range
+        const maxPrice = productsWithParsedData.reduce((max, p) => Math.max(max, p.price), 0);
+
+        setLocalFilters((prev) => {
+            const currentMax = prev.priceRange[1];
+            // Only update max price range if the new max is greater or if it's the initial default (100)
+            if (maxPrice > currentMax || currentMax === 100) {
+              return { ...prev, priceRange: [0, Math.ceil(maxPrice / 10) * 10 || 100]} // Round up to nearest 10 for max
+            }
+            return prev;
+        });
+
+        // Determine unique product types
+        const uniqueTypes = ['All', ...new Set(productsWithParsedData.map((p) => p.type).filter(Boolean))];
         setAllTypes(uniqueTypes);
 
-        // Dynamically set max price from fetched products
-        const maxPrice = productsWithParsedData.reduce((max, p) => Math.max(max, p.price), 0);
-        setFilters(prev => ({ ...prev, priceRange: [0, maxPrice > 0 ? maxPrice : 100] })); // Ensure maxPrice is at least 100 if no products
       } catch (err) {
         setError(err.message);
-        console.error("Error fetching products:", err);
+        console.error('Error fetching products:', err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchProducts();
   }, []);
 
+  // --- Filter Application Logic (Uses clean names from currentFilters) ---
   const applyFilters = useCallback(() => {
     let temp = [...allProducts];
 
-    if (filters.category !== 'All') {
-      temp = temp.filter(p => p.category?.name === filters.category);
+    // Get the normalized filter values (converts hyphenated slugs from URL into clean names with spaces)
+    const normalizedCategoryFilter = normalizeFilterName(currentFilters.category);
+    const normalizedSubCategoryFilter = normalizeFilterName(currentFilters.subCategory);
+
+    // 1. Category Filter
+    if (normalizedCategoryFilter !== 'All') {
+      temp = temp.filter((p) => {
+          // Normalize the product data's category name too for a safe, case-insensitive match
+          const productCategoryName = normalizeFilterName(p.category?.name);
+          return productCategoryName.toLowerCase() === normalizedCategoryFilter.toLowerCase();
+      });
     }
 
-    if (filters.subCategory !== 'All') {
-      temp = temp.filter(p => p.subCategory === filters.subCategory);
+    // 2. Subcategory Filter
+    if (normalizedSubCategoryFilter !== 'All') {
+      temp = temp.filter((p) => {
+          // Normalize the product data's subCategory name
+          const productSubCategoryName = normalizeFilterName(p.subCategory);
+          return productSubCategoryName.toLowerCase() === normalizedSubCategoryFilter.toLowerCase();
+      });
     }
 
-    if (filters.type !== 'All') {
-      temp = temp.filter(p => p.type === filters.type);
+    // 3. Type Filter
+    if (currentFilters.type !== 'All') {
+      temp = temp.filter((p) => p.type === currentFilters.type);
     }
 
-    temp = temp.filter(
-      p => p.price >= filters.priceRange[0] && p.price <= filters.priceRange[1]
+    // 4. Price Range Filter
+    temp = temp.filter((p) =>
+        p.price >= currentFilters.priceRange[0] &&
+        p.price <= currentFilters.priceRange[1]
     );
 
-    if (filters.minRating > 0) {
-      temp = temp.filter(p => p.rating >= filters.minRating);
+    // 5. Min Rating Filter (If we were to add it to the UI/logic)
+    if (currentFilters.minRating > 0) {
+      temp = temp.filter((p) => p.rating >= currentFilters.minRating);
     }
 
-    if (filters.searchQuery) {
-      const q = filters.searchQuery.toLowerCase();
-      temp = temp.filter(p =>
+    // 6. Search Query Filter
+    if (currentFilters.searchQuery) {
+      const q = currentFilters.searchQuery.toLowerCase();
+      temp = temp.filter((p) =>
         p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.category?.name.toLowerCase().includes(q) ||
-        p.subCategory.toLowerCase().includes(q) ||
-        p.type.toLowerCase().includes(q) ||
-        p.sellerName.toLowerCase().includes(q)
+        p.description?.toLowerCase().includes(q) ||
+        normalizeFilterName(p.category?.name)?.toLowerCase().includes(q) ||
+        normalizeFilterName(p.subCategory)?.toLowerCase().includes(q) ||
+        p.type?.toLowerCase().includes(q) ||
+        p.sellerName?.toLowerCase().includes(q)
       );
     }
 
-    switch (filters.sortBy) {
-      case 'price-asc': temp.sort((a, b) => a.price - b.price); break;
-      case 'price-desc': temp.sort((a, b) => b.price - a.price); break;
-      case 'rating-desc': temp.sort((a, b) => b.rating - a.rating); break;
-      default: break;
+    // 7. Sort
+    switch (currentFilters.sortBy) {
+      case 'price-asc':
+        temp.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-desc':
+        temp.sort((a, b) => b.price - a.price);
+        break;
+      case 'rating-desc':
+        temp.sort((a, b) => b.rating - a.rating);
+        break;
+      default:
+        // No sort or default is 'best match' (which is the order from the API)
+        break;
     }
 
     setFilteredProducts(temp);
-  }, [allProducts, filters]);
+  }, [allProducts, currentFilters]);
 
+  // Effect to trigger filtering whenever filters or products change (with debounce)
   useEffect(() => {
-    const handler = setTimeout(() => {
-      applyFilters();
-    }, 300);
+    if (allProducts.length > 0 || !loading) {
+      const handler = setTimeout(() => {
+        applyFilters();
+      }, 300); // Debounce to prevent rapid filtering on quick changes
+      return () => clearTimeout(handler);
+    }
+  }, [currentFilters, applyFilters, allProducts.length, loading]);
 
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [filters, applyFilters]);
-
+  // --- Filter Handlers ---
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({
+
+    // Logic for Category and Subcategory (updates URL with slug)
+    if (name === 'category' || name === 'subCategory') {
+        // Convert the clean name (value) to a slug for the URL
+        const slug = createSlug(value);
+        const current = Object.fromEntries(searchParams.entries());
+
+        const newParams = { ...current };
+
+        if (slug === null) { // If value is 'All'
+          delete newParams[name]; // name is 'category' or 'subcategory'
+        } else {
+          newParams[name] = slug;
+        }
+
+        if (name === 'category') {
+             // Reset subcategory if the main category changes
+             delete newParams.subcategory;
+        }
+
+        setSearchParams(newParams);
+        return;
+    }
+
+    // Logic for other local filters (type, sortBy, searchQuery)
+    setLocalFilters((prev) => ({
       ...prev,
-      [name]: (name === 'minRating' || name === 'minPrice' || name === 'maxPrice') ? parseFloat(value) : value,
+      [name]: value,
     }));
   };
 
   const handlePriceRangeChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => {
-      const newPriceRange = [...prev.priceRange];
+    const numericValue = Number(value);
+
+    setLocalFilters((prev) => {
+      let [min, max] = prev.priceRange;
+
       if (name === 'minPrice') {
-        newPriceRange[0] = parseFloat(value);
-      } else {
-        newPriceRange[1] = parseFloat(value);
+        min = Math.min(numericValue, max); // Ensure min doesn't exceed max
+      } else if (name === 'maxPrice') {
+        max = Math.max(numericValue, min); // Ensure max doesn't drop below min
       }
-      if (newPriceRange[0] > newPriceRange[1]) {
-        if (name === 'minPrice') newPriceRange[1] = newPriceRange[0];
-        else newPriceRange[0] = newPriceRange[1];
-      }
-      return { ...prev, priceRange: newPriceRange };
+
+      return { ...prev, priceRange: [min, max] };
     });
+  };
+
+  const handleCategoryBarSelect = (categoryName) => {
+    // Manually construct the event object to reuse handleFilterChange logic
+    const mockEvent = {
+        target: {
+            name: 'category',
+            value: categoryName,
+        }
+    };
+    handleFilterChange(mockEvent);
   };
 
   const resetFilters = () => {
-    const maxPrice = allProducts.reduce((max, p) => Math.max(max, p.price), 0);
-    setFilters({
-      category: 'All',
-      subCategory: 'All',
-      type: 'All',
-      priceRange: [0, maxPrice > 0 ? maxPrice : 100], // Reset to initial dynamic max price
-      minRating: 0,
-      searchQuery: '',
-      sortBy: 'default',
-    });
+    // Reset local filters to their initial state
+    setLocalFilters((prev) => ({
+        type: 'All',
+        priceRange: [0, prev.priceRange[1]], // Keep max price from fetch, but min is 0
+        minRating: 0,
+        searchQuery: '',
+        sortBy: 'default',
+    }));
+    // Clear URL search parameters
+    setSearchParams({});
+    setIsFilterPanelOpen(false); // Close the filter panel on reset
   };
 
-  const getSubcategoriesForSelectedCategory = () => {
-    if (filters.category === 'All') return ['All'];
-    const productsInSelectedCat = allProducts.filter(p => p.category?.name === filters.category);
-    const uniqueSubcategories = [...new Set(productsInSelectedCat.map(p => p.subCategory).filter(Boolean))];
-    return ['All', ...uniqueSubcategories];
-  };
+  // --- UI Rendering ---
 
-  const toastVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 25 } },
-    exit: { opacity: 0, y: 50, transition: { duration: 0.2, ease: 'easeIn' } },
-  };
-
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-green-50 to-lime-100">
-        <Loader className="animate-spin text-green-600" size={48} />
-        <p className="ml-4 text-lg text-gray-700">Harvesting fresh products...</p>
-      </div>
-    );
-  }
-
+  // Display a clear error message
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-red-600 bg-gradient-to-br from-red-50 to-orange-100">
-        <FaTimes size={48} className="mb-4" />
-        <p className="text-lg font-semibold">Error loading products: {error}</p>
-        <p className="text-sm text-gray-600 mt-2">Please ensure your backend is running and accessible.</p>
+      <div className="container mx-auto p-4 text-center mt-10">
+        <p className="text-red-500 font-bold text-xl mb-4">
+          Error loading products: {error}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+        >
+          <RefreshCcw size={16} className="inline mr-2" /> Try Again
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="w-screen min-h-screen
-                  bg-green-50 shadow-inner
-                  bg-[url('data:image/svg+xml,%3Csvg width=\'18\' height=\'18\' viewBox=\'0 0 18 18\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23d9f99d\' fill-opacity=\'0.3\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M0 0h9v3H0V0zm0 6h9v3H0V6zm0 12h9v3H0V12zM9 0h9v3H9V0zm0 6h9v3H9V6zm0 12h9v3H9V12z\'/%3E%3C/g%3E%3C/svg%3E')]
-                  bg-repeat bg-center relative">
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-16">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-playfair-display text-gray-900
-                 relative inline-block px-4 py-2 leading-tight
-                 after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-2/3 after:h-1.5 after:bg-lime-500 after:rounded-full after:transition-all after:duration-300
-                 hover:after:w-full hover:after:bg-lime-600">
-            Fresh From The Farm
-          </h1>
+    <div className="min-h-screen bg-gray-50 pt-10">
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className="text-4xl font-extrabold text-gray-900 mb-6 text-center">
+          Fresh Produce & Groceries
+        </h1>
+
+        {/* Categories Bar */}
+        <div className="mb-8 bg-white p-2 rounded-xl shadow-lg border border-green-100">
+          <CategoriesBar
+            categories={categories}
+            onSelect={handleCategoryBarSelect}
+            selectedCategory={currentFilters.category}
+          />
         </div>
 
-        {/* Filter Button for Mobile (hidden on lg and larger) */}
-        <div className="flex justify-end mb-4 lg:hidden">
-          <button
-            onClick={() => setIsFilterPanelOpen(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center shadow-md hover:bg-green-700 transition-colors duration-300"
-          >
-            <FaFilter className="mr-2" /> Filters
-          </button>
-        </div>
+        {/* Main Content Layout */}
+        <div className="flex flex-col lg:flex-row gap-8">
 
-        <div className="flex flex-col lg:flex-row lg:items-start gap-6">
-          {/* Mobile Filter Sidebar with Overlay */}
-          <AnimatePresence>
-            {isFilterPanelOpen && (
-              <>
+          {/* Filter Panel (Sidebar for large screens, Slide-over for small) */}
+          <aside className="lg:w-1/4">
+            {/* Toggle button for small screens */}
+            <motion.button
+              onClick={() => setIsFilterPanelOpen(true)}
+              className="lg:hidden w-full bg-green-500 text-white p-3 rounded-lg font-bold flex items-center justify-center mb-6 shadow-lg hover:bg-green-600 transition-colors"
+              whileTap={{ scale: 0.98 }}
+            >
+              <Filter size={18} className="mr-2" /> Show Filters
+            </motion.button>
+
+            {/* Desktop Filter Panel */}
+            <div className="hidden lg:block bg-white p-6 rounded-xl shadow-xl border border-gray-100 sticky top-4">
+              <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
+                <Filter size={20} className="inline mr-2 text-green-500" /> Filter Products
+              </h2>
+              <FilterContent
+                handleFilterChange={handleFilterChange}
+                handlePriceRangeChange={handlePriceRangeChange}
+                resetFilters={resetFilters}
+                filters={currentFilters}
+                allCategories={categories}
+                allTypes={allTypes}
+                getSubcategoriesForSelectedCategory={getSubcategoriesForSelectedCategory}
+              />
+            </div>
+
+            {/* Mobile Slide-over Filter Panel */}
+            <AnimatePresence>
+              {isFilterPanelOpen && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-                  onClick={() => setIsFilterPanelOpen(false)}
-                />
-                <motion.div
-                  initial={{ x: '-100%' }}
+                  initial={{ x: '100%' }}
                   animate={{ x: 0 }}
-                  exit={{ x: '-100%' }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                  className="fixed top-0 left-0 w-72 h-full bg-white/90 backdrop-blur-md shadow-xl p-6 z-50 overflow-y-auto"
+                  exit={{ x: '100%' }}
+                  transition={{ type: 'tween', duration: 0.3 }}
+                  className="fixed inset-0 z-50 bg-white p-6 overflow-y-auto lg:hidden"
                 >
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">Shop Filters</h2>
-                    <button onClick={() => setIsFilterPanelOpen(false)} className="text-gray-600 text-3xl hover:text-gray-900">
-                      <FaTimes />
-                    </button>
+                  <div className="flex justify-between items-center mb-6 border-b pb-3">
+                    <h2 className="text-2xl font-bold text-gray-800">Filters</h2>
+                    <motion.button
+                      onClick={() => setIsFilterPanelOpen(false)}
+                      className="text-gray-500 hover:text-gray-800 p-2"
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <X size={24} />
+                    </motion.button>
                   </div>
                   <FilterContent
                     handleFilterChange={handleFilterChange}
                     handlePriceRangeChange={handlePriceRangeChange}
                     resetFilters={resetFilters}
-                    filters={filters}
-                    allCategories={allCategories}
+                    filters={currentFilters}
+                    allCategories={categories}
                     allTypes={allTypes}
-                    allRatings={allRatings}
                     getSubcategoriesForSelectedCategory={getSubcategoriesForSelectedCategory}
                   />
                 </motion.div>
-              </>
-            )}
-          </AnimatePresence>
+              )}
+            </AnimatePresence>
+          </aside>
 
-          {/* Desktop Filter Section (Always visible on lg and up) */}
-          <div className="hidden lg:block lg:w-1/4 lg:min-w-[280px] lg:max-w-[300px] lg:flex-shrink-0">
-            <div className="bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-xl border-2 border-green-200">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Shop Filters</h2>
-              <FilterContent
-                handleFilterChange={handleFilterChange}
-                handlePriceRangeChange={handlePriceRangeChange}
-                resetFilters={resetFilters}
-                filters={filters}
-                allCategories={allCategories}
-                allTypes={allTypes}
-                allRatings={allRatings}
-                getSubcategoriesForSelectedCategory={getSubcategoriesForSelectedCategory}
-              />
+          {/* Products Grid */}
+          <main className="lg:w-3/4">
+            <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-700">
+                    Showing <span className="font-extrabold text-green-600">{filteredProducts.length}</span> Results
+                </h2>
+                {/* Desktop Sort Dropdown (re-using the same component) */}
+                <div className="hidden sm:block w-48">
+                    <label htmlFor="sortBy" className="sr-only">Sort By</label>
+                    <select
+                        id="sortBy"
+                        name="sortBy"
+                        value={currentFilters.sortBy}
+                        onChange={handleFilterChange}
+                        className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+                    >
+                        <option value="default">Best Match</option>
+                        <option value="price-asc">Price: Low to High</option>
+                        <option value="price-desc">Price: High to Low</option>
+                        <option value="rating-desc">Rating: High to Low</option>
+                    </select>
+                </div>
             </div>
-          </div>
 
-          {/* Product Grid */}
-          <section className="flex-1">
-            {filteredProducts.length === 0 ? (
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center text-gray-600 text-lg mt-10"
-              >
-                No fresh produce found matching your criteria. Try adjusting your filters.
-              </motion.p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                <AnimatePresence>
-                  {filteredProducts.map(product => (
-                    <ProductCard key={product._id} product={product} showToastMessage={showToastMessage} />
-                  ))}
-                </AnimatePresence>
+            {loading ? (
+              <div className="grid place-items-center h-48 bg-white rounded-xl shadow-lg">
+                <Loader size={36} className="animate-spin text-green-600" />
+                <p className="text-gray-500 mt-2">Loading fresh produce...</p>
               </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="bg-yellow-50 p-6 rounded-xl shadow-lg text-center border border-yellow-200">
+                <p className="text-xl font-semibold text-yellow-800">
+                  No products found!
+                </p>
+                <p className="text-yellow-700 mt-2">
+                  Try adjusting your filters or <button onClick={resetFilters} className="text-red-500 font-bold hover:underline">resetting them</button>.
+                </p>
+                
+              </div>
+            ) : (
+              <motion.div
+                layout
+                className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6"
+              >
+                {filteredProducts.map((p) => (
+                  <ProductCard key={p._id} product={p} />
+                ))}
+              </motion.div>
             )}
-          </section>
+          </main>
         </div>
       </div>
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            className={`fixed bottom-8 left-1/2 -translate-x-1/2 ${toastType === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-4 py-2 sm:px-6 sm:py-3 rounded-full shadow-lg text-sm sm:text-base z-50 flex items-center space-x-2`}
-            variants={{
-              hidden: { opacity: 0, y: 50 },
-              visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 25 } },
-              exit: { opacity: 0, y: 50, transition: { duration: 0.2, ease: 'easeIn' } },
-            }}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-          >
-            {toastType === 'success' ? <CheckCircle size={18} /> : <FaTimes size={18} />}
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

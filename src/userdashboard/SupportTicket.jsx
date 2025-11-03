@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FaTicketAlt, FaTag, FaClipboardList, FaFileAlt, FaPaperclip, FaCheckCircle, FaExclamationCircle, FaTimes, FaHashtag, FaHourglassHalf, FaEye, FaCalendarAlt, FaBoxOpen, FaCommentDots, FaTrashAlt, FaChevronLeft, FaChevronRight, FaReply, FaUserTie, FaUser, FaSpinner } from 'react-icons/fa'; // Added FaSpinner, FaUserTie, FaUser (for buyer in replies)
 import { motion, AnimatePresence } from 'framer-motion';
-
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const API_BASE = import.meta.env.VITE_API_URL;
 // --- Helper to get status badge styling ---
 const getStatusBadge = (status) => {
   let colorClass = '';
@@ -375,7 +376,7 @@ const TicketDetailView = ({ ticket, onClose, onReply, isReplying, currentUserId 
           <div className="mt-4">
             <h4 className="font-semibold text-gray-700 mb-1">Attachment:</h4>
             <a
-              href={`http://localhost:5000${ticket.attachment}`}
+              href={`${API_BASE}${ticket.attachment}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline flex items-center text-sm"
@@ -523,7 +524,7 @@ const SupportTicket = () => {
         setLoadingTickets(false);
         return;
       }
-      const response = await fetch('http://localhost:5000/api/support-tickets', {
+      const response = await fetch(`${API_BASE_URL}/support-tickets`, {
         headers: {
           'x-auth-token': token,
         },
@@ -549,7 +550,7 @@ const SupportTicket = () => {
         setLoadingTicketDetails(false);
         return;
       }
-      const response = await fetch(`http://localhost:5000/api/support-tickets/${ticketId}`, {
+      const response = await fetch(`${API_BASE_URL}/support-tickets/${ticketId}`, {
         headers: {
           'x-auth-token': token,
         },
@@ -606,7 +607,7 @@ const SupportTicket = () => {
         throw new Error("Authentication required. Please log in.");
       }
 
-      const response = await fetch('http://localhost:5000/api/support-tickets', {
+      const response = await fetch(`${API_BASE_URL}/support-tickets`, {
         method: 'POST',
         headers: {
           'x-auth-token': token,
@@ -642,7 +643,7 @@ const SupportTicket = () => {
         throw new Error("Authentication required. Please log in.");
       }
 
-      const response = await fetch(`http://localhost:5000/api/support-tickets/${ticketId}`, {
+      const response = await fetch(`${API_BASE_URL}/support-tickets/${ticketId}`, {
         method: 'DELETE',
         headers: {
           'x-auth-token': token,
@@ -672,7 +673,7 @@ const SupportTicket = () => {
         throw new Error("Authentication required. Please log in.");
       }
 
-      const response = await fetch(`http://localhost:5000/api/support-tickets/${ticketId}/reply`, {
+      const response = await fetch(`${API_BASE_URL}/support-tickets/${ticketId}/reply`, {
         method: 'POST',
         headers: {
           'x-auth-token': token,

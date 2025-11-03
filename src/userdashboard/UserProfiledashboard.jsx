@@ -4,10 +4,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // The API URLs for your backend routes.
-const ORDERS_API_URL = "http://localhost:5000/api/orders"; 
-const PROFILE_API_URL = 'http://localhost:5000/api/profile'; 
-const SELLER_API_URL = "http://localhost:5000/api/sellerprofile"; 
-const TICKETS_API_URL = "http://localhost:5000/api/support-tickets";
+const ORDERS_API_URL = `${import.meta.env.VITE_API_URL}/orders`; 
+const PROFILE_API_URL = `${import.meta.env.VITE_API_URL}/profile`; 
+const SELLER_API_URL = `${import.meta.env.VITE_API_URL}/sellerprofile`; 
+const TICKETS_API_URL = `${import.meta.env.VITE_API_URL}/support-tickets`;
 
 // A simple utility to simulate a delay for better UX in a loading state.
 const delay = (ms) => new Promise(res => setTimeout(res, ms));

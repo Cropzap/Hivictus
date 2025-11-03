@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Minus, Plus, ChevronLeft, Trash2, Check, X, Loader } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 // Helper component for form inputs inside the modal
 const InputField = ({ label, name, type = 'text', value, onChange, required = false }) => (
     <div>
@@ -122,7 +123,7 @@ const CartPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/cart', { headers: { 'x-auth-token': authToken }});
+      const response = await fetch(`${API_BASE_URL}/cart`, { headers: { 'x-auth-token': authToken }});
       if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
       const data = await response.json();
       const processedCartItems = data.items
@@ -148,7 +149,7 @@ const CartPage = () => {
       const fetchUserProfile = async () => {
         if (!authToken) return;
         try {
-          const res = await fetch('http://localhost:5000/api/profile', { headers: { 'x-auth-token': authToken }});
+          const res = await fetch(`${API_BASE_URL}/profile`, { headers: { 'x-auth-token': authToken }});
           if (res.ok) {
             const profileData = await res.json();
             setShippingDetails(prev => ({
@@ -167,7 +168,7 @@ const CartPage = () => {
   const updateCartBackend = useCallback(async (endpoint, method, body = {}) => {
     if (!authToken) { showToastMessage('Authentication required.', 'error'); return false; }
     try {
-      const response = await fetch(`http://localhost:5000/api/cart/${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/cart/${endpoint}`, {
         method: method, headers: { 'x-auth-token': authToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || 'Update failed'); }
@@ -197,7 +198,7 @@ const CartPage = () => {
     e.preventDefault();
     setIsPlacingOrder(true);
     try {
-        const response = await fetch('http://localhost:5000/api/orders/place', { // This correctly calls the order backend
+        const response = await fetch(`${API_BASE_URL}/orders/place`, { // This correctly calls the order backend
             method: 'POST', headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken }, body: JSON.stringify({ shippingAddress: shippingDetails }),
         });
         const data = await response.json();

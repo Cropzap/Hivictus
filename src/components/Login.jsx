@@ -1,24 +1,23 @@
-// src/components/Login.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, XCircle, Loader, Phone, Lock, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react'; // Using Lucide-React for icons
-import { Link } from 'react-router-dom'; // Assuming you use react-router-dom for navigation
-
-// Input field component for consistent styling
+import { CheckCircle, XCircle, Loader, Phone, Lock, LogIn, UserPlus, Eye, EyeOff, ShoppingBag } from 'lucide-react'; 
+import { Link } from 'react-router-dom'; 
+const API_URL = import.meta.env.VITE_API_URL;
+// --- Input Field Component (Styled to match the green theme) ---
 const InputField = ({ label, name, type = 'text', icon: Icon, placeholder, disabled = false, maxLength, inputMode, pattern, value, onChange }) => {
   const [showPassword, setShowPassword] = useState(false);
   const inputType = type === 'password' && showPassword ? 'text' : type;
 
   return (
-    <div className="relative mb-4">
+    <div className="relative mb-5">
       {label && (
-        <label htmlFor={name} className="block text-gray-700 text-sm font-medium mb-1">
+        <label htmlFor={name} className="block text-gray-700 text-sm font-semibold mb-1">
           {label}
         </label>
       )}
       <div className="relative">
         {Icon && (
-          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-green-500">
             <Icon size={20} />
           </div>
         )}
@@ -28,9 +27,10 @@ const InputField = ({ label, name, type = 'text', icon: Icon, placeholder, disab
           name={name}
           value={value}
           onChange={onChange}
-          placeholder={placeholder || `Enter ${label.toLowerCase()}`}
-          className={`w-full p-3 pl-10 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800
-            ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
+          placeholder={placeholder || `Enter ${label?.toLowerCase()}`}
+          className={`w-full p-3 pl-12 border border-gray-200 rounded-xl text-lg
+            focus:outline-none focus:ring-3 focus:ring-green-300 transition-all duration-300 text-gray-800 shadow-sm
+            ${disabled ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}
           `}
           disabled={disabled}
           maxLength={maxLength}
@@ -42,7 +42,7 @@ const InputField = ({ label, name, type = 'text', icon: Icon, placeholder, disab
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-green-600 transition-colors"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -53,82 +53,71 @@ const InputField = ({ label, name, type = 'text', icon: Icon, placeholder, disab
   );
 };
 
-// Agriculture-themed Animated Wheat SVG Component
-const AnimatedWheatSVG = () => (
-  <motion.svg
-    className="absolute bottom-0 left-0 w-full h-1/2 pointer-events-none opacity-40 z-0"
-    viewBox="0 0 100 100"
-    preserveAspectRatio="xMidYMax slice" // Ensures it covers the bottom area
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    {/* Background field color */}
-    <rect x="0" y="0" width="100" height="100" fill="url(#wheatGradient)" />
-
-    <defs>
-      <linearGradient id="wheatGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#dcedc8" /> {/* Light green */}
-        <stop offset="100%" stopColor="#aed581" /> {/* Medium green */}
-      </linearGradient>
-    </defs>
-
-    {/* Individual wheat stalks */}
-    {[...Array(15)].map((_, i) => (
-      <motion.path
-        key={i}
-        d={`M${5 + i * 6} 100 V${40 - (i % 5) * 5} C${5 + i * 6 + 5} ${35 - (i % 5) * 5}, ${5 + i * 6 + 10} ${30 - (i % 5) * 5}, ${5 + i * 6 + 5} ${25 - (i % 5) * 5}`}
-        fill="none"
-        stroke="#8BC34A" // Green for stalks
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: 1, opacity: 1 }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          repeatType: "reverse",
-          ease: "easeInOut",
-          delay: i * 0.2 // Staggered animation
-        }}
-      />
-    ))}
-
-    {/* Gentle swaying animation for the whole group */}
-    <motion.g
-      animate={{
-        rotate: [0, 2, -2, 0], // Sway left, right, back
-        y: [0, -2, 0] // Slight vertical movement
-      }}
-      transition={{
-        duration: 8,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }}
+// --- Animated Visual Component (Left Panel) ---
+const AnimatedMarketVisual = () => (
+  <div className="relative w-full h-full min-h-[250px] md:min-h-full flex flex-col items-center justify-center p-12 overflow-hidden bg-green-700">
+    <motion.svg
+      className="absolute inset-0 w-full h-full"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="xMidYMax slice"
+      xmlns="http://www.w3.org/2000/svg"
     >
-      {/* More wheat details (simplified for SVG size) */}
-      {[...Array(10)].map((_, i) => (
-        <motion.circle
-          key={`leaf-${i}`}
-          cx={10 + i * 9}
-          cy={60 + (i % 2) * 5}
-          r={2}
-          fill="#689F38" // Darker green for leaves
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{
-            duration: 0.8,
-            repeat: Infinity,
-            repeatType: "reverse",
-            ease: "easeOut",
-            delay: i * 0.3 + 0.5 // Staggered and delayed
-          }}
-        />
-      ))}
-    </motion.g>
-  </motion.svg>
+      {/* Background Gradient: Rich Green */}
+      <defs>
+        <linearGradient id="marketGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#15803d" /> {/* Green-700 */}
+          <stop offset="100%" stopColor="#14532d" /> {/* Green-900 */}
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="100" height="100" fill="url(#marketGradient)" />
+      
+      {/* Animated Abstract Market/Crop Shapes */}
+      {[...Array(20)].map((_, i) => {
+        const cx = 5 + (i * 5) % 90;
+        const cyBase = 80 - Math.floor(i / 10) * 30;
+        const delay = i * 0.1;
+
+        return (
+          <motion.circle
+            key={i}
+            cx={cx}
+            cy={cyBase}
+            r={1.5}
+            fill="#dcfce7" // Light green/mint color
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ 
+              scale: [0, 1.2, 1], // Pop-in effect
+              opacity: [0, 0.8, 0.5],
+              y: [0, -5, 0] // Gentle bob
+            }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              repeatType: "reverse",
+              ease: "easeInOut",
+              delay: delay
+            }}
+          />
+        );
+      })}
+    </motion.svg>
+
+    {/* Content overlay, updated for Hivictus */}
+    <div className="relative z-10 text-white text-center">
+      <h1 className="text-5xl font-extrabold tracking-wide mb-3 drop-shadow-md">
+        Hivictus
+      </h1>
+      <p className="text-lg font-light opacity-90 drop-shadow-sm">
+        Leading AgriTech e-commerce Marketplace.
+      </p>
+      <p className="mt-8 text-sm opacity-70">
+        Buy fresh, high-quality products direct from FPOs and farmers.
+      </p>
+    </div>
+  </div>
 );
 
-
-// Renamed onLoginSuccess to handleLogin to match App.jsx prop
+// --- Login Component (Core Logic Preserved) ---
 const Login = ({ handleLogin }) => {
   const [formData, setFormData] = useState({
     mobile: '',
@@ -155,7 +144,7 @@ const Login = ({ handleLogin }) => {
     setSuccessMessage('');
   };
 
-  const submitLogin = async (e) => { // Renamed to avoid conflict with prop name
+  const submitLogin = async (e) => { 
     e.preventDefault();
 
     setError('');
@@ -173,7 +162,8 @@ const Login = ({ handleLogin }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      // Logic for backend connectivity remains unchanged
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,8 +180,7 @@ const Login = ({ handleLogin }) => {
       setSuccessMessage(data.message || 'Login successful! Redirecting...');
       console.log('Login successful:', data);
 
-      if (handleLogin) { // Use the corrected prop name
-        // Pass token first, then user data, as expected by App.jsx's handleLogin
+      if (handleLogin) { 
         setTimeout(() => handleLogin(data.token, data.user), 1000);
       }
 
@@ -203,101 +192,114 @@ const Login = ({ handleLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4
-      bg-gradient-to-br from-green-50 to-emerald-100
-      bg-[url('data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23d9f99d\' fill-opacity=\'0.2\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M0 0h3v1H0V0zm0 2h3v1H0V2zm0 4h3v1H0V6zM3 0h3v1H3V0zm0 2h3v1H3V2zm0 4h3v1H3V6z\'/%3E%3C/g%3E%3C/svg%3E')]
-      bg-repeat bg-center
-    ">
+    <div className="min-h-screen w-full bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center p-4">
       <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md border border-gray-200 relative overflow-hidden z-10"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+        // Use max-w-6xl for a wider desktop split-screen view
+        className="flex flex-col md:flex-row w-full max-w-6xl bg-white 
+          rounded-3xl shadow-2xl overflow-hidden min-h-[600px] hover:shadow-3xl transition-shadow duration-300"
       >
-        {/* Agriculture-themed Animated Wheat SVG */}
-        <AnimatedWheatSVG />
 
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-8 relative z-20">
-          Welcome Back!
-        </h2>
+        {/* Left Side: Animated Visual (5/12) */}
+        <div className="md:w-5/12 w-full h-auto order-1 md:order-none">
+          <AnimatedMarketVisual />
+        </div>
 
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mb-4 flex items-center space-x-2 z-20"
-              role="alert"
-            >
-              <XCircle size={20} />
-              <span className="block sm:inline">{error}</span>
-            </motion.div>
-          )}
-          {successMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative mb-4 flex items-center space-x-2 z-20"
-              role="alert"
-            >
-              <CheckCircle size={20} />
-              <span className="block sm:inline">{successMessage}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <form onSubmit={submitLogin} className="relative z-20"> {/* Ensure form is above SVG */}
-          <InputField
-            label="Mobile Number"
-            name="mobile"
-            type="text"
-            icon={Phone}
-            placeholder="e.g., 9876543210"
-            maxLength={10}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={formData.mobile}
-            onChange={handleChange}
-          />
-          <InputField
-            label="Password"
-            name="password"
-            type="password"
-            icon={Lock}
-            placeholder="Enter your password"
-            value={formData.password}
-            onChange={handleChange}
-          />
-
-          <Link to="/forgot-password" className="block text-right text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200 mb-6">
-            Forgot Password?
-          </Link>
-
-          <motion.button
-            type="submit"
-            disabled={loading}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all duration-300 flex items-center justify-center space-x-2 shadow-lg"
-          >
-            {loading ? (
-              <Loader className="animate-spin" size={20} />
-            ) : (
-              <LogIn size={20} />
+        {/* Right Side: Login Form (7/12) */}
+        <div className="md:w-7/12 w-full p-8 sm:p-12 flex flex-col justify-center order-2 md:order-none">
+          
+          <div className="text-center md:text-left mb-8">
+            <ShoppingBag size={32} className="text-green-600 mb-2 mx-auto md:mx-0" />
+            <h2 className="text-3xl font-bold text-gray-800">
+              Welcome Back to Hivictus!
+            </h2>
+            <p className="text-gray-500 text-md mt-1">
+              Sign in to manage your high-quality fresh produce orders.
+            </p>
+          </div>
+          
+          {/* Status Messages */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-red-50 border border-red-300 text-red-600 px-4 py-3 rounded-lg relative mb-4 flex items-center space-x-3 text-sm overflow-hidden"
+                role="alert"
+              >
+                <XCircle size={18} />
+                <span className="block font-medium">{error}</span>
+              </motion.div>
             )}
-            <span>{loading ? 'Logging In...' : 'Login'}</span>
-          </motion.button>
+            {successMessage && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-green-50 border border-green-300 text-green-600 px-4 py-3 rounded-lg relative mb-4 flex items-center space-x-3 text-sm overflow-hidden"
+                role="alert"
+              >
+                <CheckCircle size={18} />
+                <span className="block font-medium">{successMessage}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          <p className="text-center text-gray-600 text-sm mt-6">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200 flex items-center justify-center space-x-1 mt-2">
-              <UserPlus size={16} />
-              <span>Sign Up</span>
+          <form onSubmit={submitLogin}>
+            <InputField
+              label="Mobile Number"
+              name="mobile"
+              type="text"
+              icon={Phone}
+              placeholder="e.g., 12345 67890"
+              maxLength={10}
+              inputMode="numeric"
+              pattern="[0-9]{10}"
+              value={formData.mobile}
+              onChange={handleChange}
+            />
+            <InputField
+              label="Password"
+              name="password"
+              type="password"
+              icon={Lock}
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleChange}
+            />
+
+            <Link to="/forgot-password" className="block text-right text-sm text-green-600 hover:text-green-800 transition-colors duration-200 mb-6 font-medium">
+              Forgot Password?
             </Link>
-          </p>
-        </form>
+
+            <motion.button
+              type="submit"
+              disabled={loading}
+              // Hover effect uses a pleasant green shadow
+              whileHover={{ scale: 1.01, boxShadow: '0 8px 20px rgba(76, 175, 80, 0.4)' }}
+              whileTap={{ scale: 0.99 }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition-all duration-300 flex items-center justify-center space-x-2 shadow-lg shadow-green-200/50 disabled:bg-gray-400"
+            >
+              {loading ? (
+                <Loader className="animate-spin" size={20} />
+              ) : (
+                <LogIn size={20} />
+              )}
+              <span>{loading ? 'Authenticating...' : 'Login to Shop'}</span>
+            </motion.button>
+
+            <p className="text-center text-gray-500 text-sm mt-8">
+              New to Hivictus?{' '}
+              <Link to="/register" className="text-green-600 hover:text-green-800 font-bold transition-colors duration-200 inline-flex items-center space-x-1">
+                <UserPlus size={16} />
+                <span>Create a Consumer Account</span>
+              </Link>
+            </p>
+          </form>
+        </div>
       </motion.div>
     </div>
   );

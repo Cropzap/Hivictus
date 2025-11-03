@@ -1,284 +1,245 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  FaFacebookF,
-  FaTwitter,
-  FaInstagram,
-  FaLinkedinIn,
-  FaApple, // For App Store
-  FaGooglePlay, // For Play Store
-} from 'react-icons/fa';
+  Facebook,
+  Twitter,
+  Instagram,
+  Linkedin,
+  Truck,
+  ShieldCheck, 
+  Mail, 
+  Loader, 
+} from 'lucide-react';
 
-// --- Mock Data and Helper Functions for standalone example ---
-// In a real project, these would come from your actual imports.
-const convertTextToURLSlug = (text) => text.toLowerCase().replace(/\s+/g, '-');
-const getCategoryLink = (cat) => `/category/${convertTextToURLSlug(cat.title)}`;
+// --- Configuration and Helper Functions ---
+const CATEGORIES_API_URL = 'http://localhost:5000/api/categories';
+const DISPLAY_CATEGORY_COUNT = 5; // Display only the first 5 categories in the footer
 
-// Using placeholder images for logos for demonstration
-const AppStoreLogo = 'https://placehold.co/100x30/000/FFF?text=AppStore';
-const PlayStoreLogo = 'https://placehold.co/100x30/000/FFF?text=PlayStore';
+// Helper to convert text to a URL-friendly slug
+const convertTextToURLSlug = (text) => (text || '').toLowerCase().replace(/\s+/g, '-').replace(/&/g, 'and');
 
-const Brands = ['Brand A', 'Brand B', 'Brand C', 'Brand D', 'Brand E', 'Brand F'];
-const Categories = [
-  { id: 'cat1', title: 'Fruits & Vegetables' },
-  { id: 'cat2', title: 'Grains & Pulses' },
-  { id: 'cat3', title: 'Dairy & Eggs' },
-  { id: 'cat4', title: 'Spices & Herbs' },
-  { id: 'cat5', title: 'Organic Products' },
-  { id: 'cat6', title: 'Farm Equipment' },
+// Function to map link text directly to the provided routes
+const mapLinkToRoute = (text) => {
+  const slug = convertTextToURLSlug(text);
+  
+  // Custom static routes
+  if (slug.includes('privacy-policy')) return '/privacy-policy';
+  if (slug.includes('terms-and-conditions')) return '/terms-and-conditions';
+  if (slug.includes('faq')) return '/faq';
+  if (slug.includes('about-us')) return '/about';
+  if (slug.includes('contact-us') || slug.includes('support')) return '/support'; 
+  
+  // Default mapping
+  return `/${slug}`;
+};
+
+// --- Static Link Data (As in your original component) ---
+const CompanyLinks = [
+  { text: 'About Us', link: mapLinkToRoute('About Us') }, 
+  { text: 'Careers', link: mapLinkToRoute('Careers') }, 
+  { text: 'Blog', link: mapLinkToRoute('Blog') }, 
+  { text: 'Orders', link: mapLinkToRoute('Orders') },
 ];
 
-const UsefulLinks = [
-  'About Us', 'Careers', 'Blog', 'Press',
-  'Privacy Policy', 'Terms of Service', 'FAQs', 'Security',
-  'Contact Us', 'Partner With Us', 'Express Delivery', 'Local Stores',
+const CustomerServiceLinks = [
+  { text: 'Privacy Policy', link: mapLinkToRoute('Privacy Policy') }, 
+  { text: 'Terms & Conditions', link: mapLinkToRoute('Terms and Conditions') }, 
+  { text: 'FAQs', link: mapLinkToRoute('FAQ') }, 
+  { text: 'Support', link: mapLinkToRoute('Support') }, 
 ];
 
-const PaymentPartners = [
-  { logoName: 'mobikwik', alt: 'MobikWik' },
-  { logoName: 'paytm', alt: 'PayTm' },
-  { logoName: 'visa', alt: 'Visa' },
-  { logoName: 'mastercard', alt: 'Mastercard' },
-  { logoName: 'rupay', alt: 'RuPay' },
-  { logoName: 'bhim', alt: 'BHIM UPI' },
-  { logoName: '', alt: 'Net Banking' },
-  { logoName: '', alt: 'Cash on Delivery' },
+const FeatureLinks = [
+  { text: 'Express Delivery', link: mapLinkToRoute('Express Delivery'), icon: Truck }, 
+  { text: 'Security & Trust', link: mapLinkToRoute('Security'), icon: ShieldCheck },
 ];
-// --- End Mock Data ---
 
-
+// --- Footer Component ---
 const Footer = () => {
-  const allCategories = Categories.map((cat) => ({
-    id: cat.id,
-    text: cat.title,
-    link: getCategoryLink(cat),
-  }));
+  const [categories, setCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const allBrands = Brands.map((brand) => ({
-    text: brand,
-    link: convertTextToURLSlug(brand),
-  }));
+  useEffect(() => {
+    // Function to fetch categories from the configured API URL
+    const loadCategories = async () => {
+      try {
+        const response = await fetch(CATEGORIES_API_URL);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        // **IMPORTANT:** Assuming the API returns an ARRAY of category objects.
+        // If it returns a single object like the one you provided, you'd wrap it in an array:
+        // const rawData = await response.json();
+        // const data = Array.isArray(rawData) ? rawData : [rawData];
+        
+        const data = await response.json();
+
+        // 🎯 FIX: Filter out categories where the 'name' field is missing or invalid.
+        // We are now looking for the 'name' field as per your data model.
+        const validCategories = data.filter(cat => cat && cat.name);
+        
+        // 🎯 FIX: Map the data to a consistent structure for the component to use.
+        // This is a good practice to protect the component from backend changes.
+        const mappedCategories = validCategories.map(cat => ({
+            id: cat._id.$oid,
+            // **Key Change: Using 'name' from your data model**
+            name: cat.name,
+            slug: convertTextToURLSlug(cat.name),
+            image: cat.mainImage // Optional: Keep the image link
+        }));
+        
+        setCategories(mappedCategories);
+      } catch (error) {
+        console.error("Failed to fetch categories from backend:", error.message);
+        setCategories([]); 
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  // Generates a link to the products page filtered by category
+  const getCategoryLink = (cat) => {
+    // Links to /products route using a query parameter for filtering
+    return `/products?category=${cat.slug}`;
+  };
 
   return (
-    <footer className="font-sans">
-      {/* Desktop Footer - Visible on medium screens and up */}
-      <div className="hidden md:block bg-gradient-to-b from-green-900 to-green-950 text-green-100 py-12 lg:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+    <footer className="font-sans bg-gray-950 text-gray-300 border-t border-gray-800 shadow-2xl">
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
 
-          {/* Top Section: Categories, Useful Links, Brands */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 pb-8 border-b border-green-800">
-            {/* Categories */}
-            <div>
-              <h4 className="font-bold text-xl text-white mb-5">Categories</h4>
-              <div className="grid grid-cols-2 gap-y-2 text-sm">
-                {allCategories.map((cat) => (
+        {/* Top Section: Links Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-y-8 gap-x-6 pb-8 border-b border-gray-800">
+
+          {/* Column 1: Shop Categories (Backend Data) */}
+          <div className="col-span-1">
+            <h4 className="font-bold text-lg text-white mb-4 uppercase tracking-wider">Shop</h4>
+            <ul className="space-y-2 text-sm">
+              {isLoading && (
+                <li className="text-gray-500 flex items-center">
+                  <Loader className="w-4 h-4 mr-2 animate-spin text-emerald-500" />
+                  Loading categories...
+                </li>
+              )}
+              {!isLoading && categories.length === 0 && (
+                <li className="text-red-400">
+                  No categories found.
+                </li>
+              )}
+              
+              {/* Display minimal categories with corrected 'name' field */}
+              {categories.slice(0, DISPLAY_CATEGORY_COUNT).map((cat) => (
+                // Using cat.id is safer for keys, assuming it's available after mapping
+                <li key={cat.id || cat.slug}>
                   <Link
-                    to={cat.link}
-                    key={cat.id}
-                    className="hover:text-emerald-400 transition-colors duration-200"
+                    to={getCategoryLink(cat)}
+                    className="hover:text-emerald-400 transition-colors duration-200 block"
                   >
-                    {cat.text}
+                    {/* **Key Change: Displaying cat.name** */}
+                    {cat.name}
                   </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Useful Links */}
-            <div>
-              <h4 className="font-bold text-xl text-white mb-5">Useful Links</h4>
-              <div className="grid grid-cols-2 gap-y-2 text-sm">
-                {UsefulLinks.map((link, i) => (
-                  <Link
-                    to={`/${convertTextToURLSlug(link)}`}
-                    key={i}
-                    className="hover:text-emerald-400 transition-colors duration-200"
-                  >
-                    {link}
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Brands */}
-            <div className="lg:col-span-2">
-              <h4 className="font-bold text-xl text-white mb-5">Brands</h4>
-              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                {allBrands.map((brand, i) => (
-                  <Link
-                    key={i}
-                    to={`/brand/${brand.link}`}
-                    className="hover:text-emerald-400 transition-colors duration-200"
-                  >
-                    {brand.text} {/* CORRECTED LINE: Render brand.text */}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Partners Section */}
-          <div className="border-b border-green-800 pb-10">
-            <h4 className="font-bold text-xl text-white mb-6">Payment Partners</h4>
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 sm:gap-6">
-              {PaymentPartners.map((partner, i) => (
-                <div
-                  key={i}
-                  className="w-24 h-16 sm:w-28 sm:h-20 flex items-center justify-center p-2 rounded-xl
-                             bg-green-800/30 backdrop-blur-sm border border-green-700/50 shadow-lg
-                             transition-all duration-300 hover:scale-105 hover:bg-green-700/40"
-                >
-                  {partner.logoName ? (
-                    <img
-                      src={`/${partner.logoName}.webp`}
-                      alt={partner.alt}
-                      className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
-                      onError={(e) => { e.target.onerror = null; e.target.src = `https://placehold.co/60x60/333/FFF?text=${partner.alt.charAt(0)}`; }}
-                    />
-                  ) : (
-                    <span className="text-xs text-green-100 text-center leading-tight">
-                      {partner.alt}
-                    </span>
-                  )}
-                </div>
+                </li>
               ))}
-            </div>
+              
+              {/* Optional: Add a "View All" link if there are more than 5 */}
+              {categories.length > DISPLAY_CATEGORY_COUNT && (
+                 <li className="pt-2">
+                    <Link
+                        to="/products"
+                        className="text-emerald-500 font-medium hover:text-emerald-400 transition-colors duration-200 block"
+                    >
+                        View All Categories &rarr;
+                    </Link>
+                </li>
+              )}
+            </ul>
+          </div>
+          
+          {/* Column 2: Company Links */}
+          <div className="col-span-1">
+            <h4 className="font-bold text-lg text-white mb-4 uppercase tracking-wider">Company</h4>
+            <ul className="space-y-2 text-sm">
+              {CompanyLinks.map((item, index) => (
+                <li key={index}>
+                  <Link 
+                    to={item.link} 
+                    className="hover:text-emerald-400 transition-colors duration-200 block"
+                  >
+                    {item.text}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {/* Bottom Bar: Copyright, Download App, Social Media */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8 pt-6">
-            {/* Copyright */}
-            <div className="text-sm text-green-300 text-center md:text-left flex-1">
-              &copy; Zoyokart Commerce Private Limited, 2016-2025. All rights reserved.
-            </div>
+          {/* Column 3: Customer Service Links */}
+          <div className="col-span-1">
+            <h4 className="font-bold text-lg text-white mb-4 uppercase tracking-wider">Support</h4>
+            <ul className="space-y-2 text-sm">
+              {CustomerServiceLinks.map((item, index) => (
+                <li key={index}>
+                  <Link 
+                    to={item.link} 
+                    className="hover:text-emerald-400 transition-colors duration-200 block"
+                  >
+                    {item.text}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-            {/* Download App */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 justify-center md:justify-start">
-              <h4 className="font-bold text-lg text-white whitespace-nowrap">
-                Download App:
-              </h4>
-              <div className="flex gap-3">
-                <Link to="/download/app-store" className="block">
-                  <img
-                    src={AppStoreLogo}
-                    alt="App store"
-                    className="h-9 w-28 object-contain rounded-lg shadow-md transition-transform duration-200 hover:scale-105"
-                  />
-                </Link>
-                <Link to="/download/play-store" className="block">
-                  <img
-                    src={PlayStoreLogo}
-                    alt="Play store"
-                    className="h-9 w-28 object-contain rounded-lg shadow-md transition-transform duration-200 hover:scale-105"
-                  />
-                </Link>
-              </div>
-            </div>
-
-            {/* Social Media Icons */}
-            <div className="flex items-center gap-4 flex-1 justify-center md:justify-end">
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="w-10 h-10 rounded-full bg-green-800/30 backdrop-blur-sm text-white flex items-center justify-center text-lg
-                           shadow-md transition-all duration-200 hover:bg-green-700/40 hover:scale-110 border border-green-700/50"
-              >
-                <FaFacebookF />
-              </a>
-              <a
-                href="https://twitter.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Twitter"
-                className="w-10 h-10 rounded-full bg-green-800/30 backdrop-blur-sm text-white flex items-center justify-center text-lg
-                           shadow-md transition-all duration-200 hover:bg-green-700/40 hover:scale-110 border border-green-700/50"
-              >
-                <FaTwitter />
-              </a>
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="w-10 h-10 rounded-full bg-green-800/30 backdrop-blur-sm text-white flex items-center justify-center text-lg
-                           shadow-md transition-all duration-200 hover:bg-green-700/40 hover:scale-110 border border-green-700/50"
-              >
-                <FaInstagram />
-              </a>
-              <a
-                href="https://linkedin.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="LinkedIn"
-                className="w-10 h-10 rounded-full bg-green-800/30 backdrop-blur-sm text-white flex items-center justify-center text-lg
-                           shadow-md transition-all duration-200 hover:bg-green-700/40 hover:scale-110 border border-green-700/50"
-              >
-                <FaLinkedinIn />
-              </a>
-            </div>
+          {/* Column 4: Key Features & Contact */}
+          <div className="col-span-2 md:col-span-1 lg:col-span-2">
+            <h4 className="font-bold text-lg text-white mb-4 uppercase tracking-wider">Our Commitment</h4>
+            <ul className="space-y-3 text-sm">
+              {FeatureLinks.map((item, index) => (
+                <li key={index} className="flex items-center">
+                  <item.icon className="w-5 h-5 mr-3 text-emerald-500" />
+                  <Link 
+                    to={item.link} 
+                    className="hover:text-emerald-400 transition-colors duration-200"
+                  >
+                    {item.text}
+                  </Link>
+                </li>
+              ))}
+              <li className="flex items-center pt-3">
+                  <Mail className="w-5 h-5 mr-3 text-emerald-500" />
+                  <a 
+                    href="mailto:support@shopname.com" 
+                    className="hover:text-emerald-400 transition-colors duration-200"
+                  >
+                    .com
+                  </a>
+              </li>
+            </ul>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Footer - Visible only on small screens */}
-      <div className="md:hidden bg-green-900 text-green-100 py-4 px-4">
-        <div className="flex flex-col items-center justify-center text-center space-y-3">
-          {/* App Download Links (Icons only for compactness) */}
-          <div className="flex gap-4 mb-2">
-            <Link to="/download/app-store" aria-label="Download on App Store">
-              <FaApple className="text-3xl text-white hover:text-emerald-400 transition-colors" />
-            </Link>
-            <Link to="/download/play-store" aria-label="Get it on Google Play">
-              <FaGooglePlay className="text-3xl text-white hover:text-emerald-400 transition-colors" />
-            </Link>
-          </div>
-
-          {/* Social Media Links (Icons only) */}
-          <div className="flex gap-4 mb-3">
-            <a
-              href="https://facebook.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Facebook"
-              className="text-white text-xl hover:text-emerald-400 transition-colors"
-            >
-              <FaFacebookF />
+        {/* Bottom Section: Copyright & Socials */}
+        <div className="flex flex-col md:flex-row md:justify-between items-center pt-8">
+          <p className="text-sm text-gray-500">
+            &copy; {new Date().getFullYear()} ShopName. All rights reserved.
+          </p>
+          <div className="flex space-x-6 mt-4 md:mt-0">
+            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+              <Facebook className="w-5 h-5" />
             </a>
-            <a
-              href="https://twitter.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Twitter"
-              className="text-white text-xl hover:text-emerald-400 transition-colors"
-            >
-              <FaTwitter />
+            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+              <Twitter className="w-5 h-5" />
             </a>
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-              className="text-white text-xl hover:text-emerald-400 transition-colors"
-            >
-              <FaInstagram />
+            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+              <Instagram className="w-5 h-5" />
             </a>
-            <a
-              href="https://linkedin.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LinkedIn"
-              className="text-white text-xl hover:text-emerald-400 transition-colors"
-            >
-              <FaLinkedinIn />
+            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+              <Linkedin className="w-5 h-5" />
             </a>
-          </div>
-
-          {/* Copyright */}
-          <div className="text-xs text-green-300">
-            &copy; Zoyokart Commerce Private Limited, 2016-2025.
           </div>
         </div>
+
       </div>
     </footer>
   );

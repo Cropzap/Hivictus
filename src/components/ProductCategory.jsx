@@ -1,268 +1,342 @@
-import React, { useState, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
-import Slider from 'react-slick';
-import 'slick-carousel/slick/slick.css';
-import 'slick-carousel/slick/slick-theme.css';
-import { Loader } from 'lucide-react'; // Import Loader icon
+import React, { useState, useEffect, useCallback } from 'react';
+// Note: useNavigate and Link are kept for context, but require a running router environment to function fully.
+import { useNavigate, Link } from 'react-router-dom'; 
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, ChevronLeft, Loader, Package, Info, ShoppingBag } from 'lucide-react';
 
-// --- MainCategoryCard Component ---
-const MainCategoryCard = ({ category, onClick }) => {
-  const displayedSubcategories = category.subcategories.slice(0, 4);
-  const remainingSubcategoriesCount = category.subcategories.length - displayedSubcategories.length;
+// --- Utility Components ---
+const API_URL = import.meta.env.VITE_API_URL;
+/**
+ * Renders an individual subcategory item in the right panel.
+ */
+const SubCategoryItem = ({ subcategory, onClick, mainCategorySlug }) => {
+  // Use a fallback for _id if it's missing (though a real backend should provide one)
+  const key = subcategory._id || subcategory.name; 
+  const subCategorySlug = subcategory.name.toLowerCase().replace(/\s/g, '-');
+  // Mock link path
+  const linkTo = `/products?category=${mainCategorySlug}&subcategory=${subCategorySlug}`;
 
   return (
-    <div
-      className="relative flex flex-col justify-end w-full h-52 sm:h-64 rounded-[2.5rem] shadow-xl cursor-pointer
-                 transition-all duration-300 ease-in-out transform overflow-hidden group
-                 hover:scale-[1.03] hover:shadow-2xl active:scale-98 active:shadow-lg"
-      onClick={() => onClick(category)} // Pass the whole category object
+    <motion.div
+      key={key}
+      className="flex flex-col items-center p-4 rounded-2xl cursor-pointer bg-white transition-all duration-300 border border-gray-200 transform hover:scale-[1.05] hover:shadow-xl shadow-md"
+      onClick={() => onClick(subcategory)}
+      whileTap={{ scale: 0.98 }}
     >
-      {/* Subtle Background Image (from mainImage) - visible behind the "glass" */}
-      <img
-        src={category.mainImage || 'https://placehold.co/300x300/E0E0E0/555555?text=Category'} // Fallback placeholder
-        alt={category.name}
-        className="absolute inset-0 w-full h-full object-cover rounded-[2.5rem]" // More rounded
-        onError={(e) => { e.target.onerror = null; e.target.src = `https://placehold.co/300x300/E0E0E0/555555?text=${encodeURIComponent(category.name.split(' ')[0])}`; }}
-      />
-
-      {/* Subcategory Image Collage - This is the "folder" with liquid glass effect */}
-      <div
-        className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2 p-3 rounded-[2.5rem]
-                   bg-lime-900/20 backdrop-blur-sm border border-lime-200/30 shadow-inner-lg" // Themed glass
+      <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center overflow-hidden rounded-full bg-green-50 border-4 border-green-300/50">
+        <img
+          src={subcategory.image || 'https://placehold.co/80x80/E0E0E0/333333?text=Sub'}
+          alt={subcategory.name}
+          className="w-full h-full object-cover transform transition-transform duration-300 group-hover:scale-110"
+          onError={(e) => { e.target.onerror = null; e.target.src = `https://placehold.co/80x80/E0E0E0/333333?text=${encodeURIComponent(subcategory.name.charAt(0))}`; }}
+        />
+      </div>
+      <p className="text-center text-base font-bold text-gray-800 mt-3 leading-tight truncate w-full px-1">
+        {subcategory.name}
+      </p>
+      <Link 
+        to={linkTo} 
+        className="mt-2 flex items-center text-sm font-semibold text-green-600 hover:text-green-800 transition-colors"
+        onClick={(e) => { e.stopPropagation(); onClick(subcategory); }}
       >
-        {displayedSubcategories.map((sub, index) => (
-          <div
-            key={sub._id || index} // Use _id from MongoDB
-            className="w-full h-full flex items-center justify-center rounded-2xl overflow-hidden // More rounded
-                       bg-lime-100/40 border border-lime-200/50 shadow-sm" // Themed background
-          >
-            <img
-              src={sub.image || 'https://placehold.co/100x100/A0A0A0/FFFFFF?text=Sub'} // Fallback placeholder
-              alt={sub.name}
-              className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-xl transform transition-transform duration-200 group-hover:scale-110" // More rounded
-              onError={(e) => { e.target.onerror = null; e.target.src = `https://placehold.co/100x100/A0A0A0/FFFFFF?text=${encodeURIComponent(sub.name.charAt(0))}`; }}
-            />
-          </div>
-        ))}
-        {/* Add placeholders if there are fewer than 4 subcategories to maintain grid structure */}
-        {Array.from({ length: 4 - displayedSubcategories.length }).map((_, i) => (
-          <div key={`placeholder-${i}`} className="w-full h-full bg-lime-100/30 rounded-2xl flex items-center justify-center text-gray-700 text-xs">
-            {/* You can put a generic icon or text here if desired */}
-          </div>
-        ))}
-      </div>
+        Explore <ChevronRight size={16} className="ml-1" />
+      </Link>
+    </motion.div>
+  );
+};
 
-      {/* Content Overlay for Name and Count - now at the bottom */}
-      <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col p-4 bg-green-900/70 backdrop-blur-sm group-hover:bg-green-900/85 transition-colors duration-300 rounded-b-[2.5rem]">
-        <h3 className="text-white text-lg sm:text-xl font-bold text-center leading-tight drop-shadow-md">
-          {category.name}
-        </h3>
-        {remainingSubcategoriesCount > 0 && (
-          <p className="text-lime-200 text-sm mt-1 font-medium opacity-80 group-hover:opacity-100 transition-opacity duration-200 text-center drop-shadow-sm">
-            + {remainingSubcategoriesCount} more
-          </p>
-        )}
-      </div>
+// --- Main Category Card with Navigation and Animation ---
+const MainCategoryCard = ({ category, categoryIndex, totalCategories, onNavigate }) => {
+    
+  // Framer Motion variants for the slide animation
+  const categoryVariants = {
+    enter: (direction) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1,
+      transition: { 
+        x: { type: "spring", stiffness: 300, damping: 30 },
+        opacity: { duration: 0.2 }
+      }
+    },
+    exit: (direction) => ({
+      zIndex: 0,
+      x: direction < 0 ? '100%' : '-100%',
+      opacity: 0,
+      transition: { 
+        x: { type: "spring", stiffness: 300, damping: 30 },
+        opacity: { duration: 0.2 }
+      }
+    })
+  };
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      <AnimatePresence initial={false} custom={onNavigate.direction}>
+        <motion.div
+          key={category._id}
+          custom={onNavigate.direction}
+          variants={categoryVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          className="absolute inset-0 rounded-2xl overflow-hidden"
+        >
+          {/* Background Image */}
+          <img
+            src={category.mainImage || 'https://placehold.co/800x600/508D4E/FFFFFF?text=Category'}
+            alt={category.name}
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ objectPosition: 'center' }}
+          />
+          {/* Dark Gradient Overlay for readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+
+          {/* Content */}
+          <div className="relative z-10 flex flex-col items-start justify-end h-full p-8 text-white">
+            <p className="text-sm font-semibold tracking-widest uppercase text-green-300 mb-1 backdrop-blur-sm bg-black/30 px-2 py-0.5 rounded">
+                Category {categoryIndex + 1} of {totalCategories}
+            </p>
+            {/* Reduced heading size: text-4xl sm:text-5xl -> text-3xl sm:text-4xl */}
+            <h3 className="text-3xl sm:text-4xl font-extrabold leading-tight drop-shadow-lg">
+              {category.name}
+            </h3>
+            <p className="text-lg font-medium mt-2 drop-shadow-md">
+              {category.subcategories ? category.subcategories.length : 0} Sub-categories ready for harvest.
+            </p>
+            <Link
+                to={`/products?category=${category.name.toLowerCase().replace(/\s/g, '-')}`}
+                className="mt-6 flex items-center px-8 py-3 bg-green-500 text-white rounded-full font-bold text-lg hover:bg-green-600 transition-all shadow-2xl hover:shadow-green-500/50 transform hover:scale-[1.02]"
+            >
+                <ShoppingBag size={20} className="mr-2" /> View All Products
+            </Link>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+      
+      {/* Navigation Buttons */}
+      <motion.button
+        onClick={() => onNavigate(-1)}
+        disabled={categoryIndex === 0}
+        className="absolute left-4 top-1/2 z-20 transform -translate-y-1/2 p-4 bg-white/80 backdrop-blur-sm rounded-full shadow-xl text-green-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white hover:text-green-800 active:scale-90"
+        aria-label="Previous Category"
+        whileHover={{ scale: 1.1 }}
+      >
+        <ChevronLeft size={30} />
+      </motion.button>
+      
+      <motion.button
+        onClick={() => onNavigate(1)}
+        disabled={categoryIndex === totalCategories - 1}
+        className="absolute right-4 top-1/2 z-20 transform -translate-y-1/2 p-4 bg-white/80 backdrop-blur-sm rounded-full shadow-xl text-green-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white hover:text-green-800 active:scale-90"
+        aria-label="Next Category"
+        whileHover={{ scale: 1.1 }}
+      >
+        <ChevronRight size={30} />
+      </motion.button>
     </div>
   );
 };
 
-// --- SubCategoryModal Component (Updated for iOS-like UI and Agriculture Theme) ---
-const SubCategoryModal = ({ mainCategoryName, subcategories, onClose, onSelectSubCategory }) => {
-  const [visibleItems, setVisibleItems] = useState([]);
-  const [isClosing, setIsClosing] = useState(false);
+
+// --- Main Category Explorer Component ---
+const FullWidthCategoryExplorer = () => {
+  // navigate is kept for context, replace with actual router implementation if needed
+  const navigate = console.log; 
+  
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [categoryIndex, setCategoryIndex] = useState(0);
+  const [direction, setDirection] = useState(0); // 1 for right, -1 for left
+
+  /**
+   * Fetches category data from the backend API.
+   */
+  const fetchCategories = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/categories`);
+      
+      if (!response.ok) {
+        // Log the response status and throw an error for non-2xx statuses
+        throw new Error(`Failed to fetch categories. HTTP Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data) && data.length > 0) {
+        setCategories(data);
+      } else {
+        // Handle case where fetch succeeds but returns empty/invalid data
+        setCategories([]);
+        setError("Received empty or invalid category data from the server."); 
+      }
+      
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+      // Set a user-friendly error message
+      setError(`Connection Error: Could not connect to the backend (http://localhost:5000/api/categories).`);
+      setCategories([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setVisibleItems([]); // Reset on new subcategories
-    subcategories.forEach((sub, index) => {
-      setTimeout(() => {
-        setVisibleItems((prev) => [...prev, sub._id]); // Use _id for tracking visibility
-      }, 70 * index); // Staggered animation for a smooth entrance
-    });
-  }, [subcategories]);
+    fetchCategories();
+  }, [fetchCategories]);
 
-  const handleClose = () => {
-    setIsClosing(true);
-    setTimeout(onClose, 300); // Match with modal-fade-out duration
+  // Reset index if categories change (e.g., successful fetch after an error)
+  useEffect(() => {
+    if (categories.length > 0 && categoryIndex >= categories.length) {
+        setCategoryIndex(0);
+    }
+  }, [categories, categoryIndex]);
+
+
+  // --- Handlers ---
+  const handleCategoryNavigation = (newDirection) => {
+    setDirection(newDirection);
+    setCategoryIndex(prevIndex => {
+      const newIndex = prevIndex + newDirection;
+      if (newIndex >= 0 && newIndex < categories.length) {
+        return newIndex;
+      }
+      return prevIndex;
+    });
   };
 
-  return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-60
-                  ${isClosing ? 'animate-modal-overlay-fade-out' : 'animate-modal-overlay-fade-in'}`}
-      onClick={handleClose}
-    >
-      <div
-        className={`bg-lime-50/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl p-6 relative w-11/12 max-w-lg sm:max-w-xl md:max-w-2xl lg:max-w-4xl
-                    max-h-[90vh] overflow-y-auto transform border border-lime-200/50 // Themed border
-                    ${isClosing ? 'animate-modal-zoom-out' : 'animate-modal-zoom-in'}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 text-gray-700 bg-white/50 backdrop-blur-sm transition-colors text-xl p-2 rounded-full shadow-md border border-white/50
-                     hover:bg-white/70 active:scale-95"
-          aria-label="Close modal"
+  const handleSelectSubCategory = (subCategory) => {
+    const selectedCategory = categories[categoryIndex];
+    if (selectedCategory) {
+      const mainCategorySlug = selectedCategory.name.toLowerCase().replace(/\s/g, '-');
+      const subCategorySlug = subCategory.name.toLowerCase().replace(/\s/g, '-');
+      // Replace with actual React Router navigation if available
+      console.log(`Navigating to: /products?category=${mainCategorySlug}&subcategory=${subCategorySlug}`);
+      // navigate(`/products?category=${mainCategorySlug}&subcategory=${subCategorySlug}`);
+    }
+  };
+
+  const currentCategory = categories[categoryIndex];
+  const currentSubcategories = currentCategory ? currentCategory.subcategories : [];
+  const mainCategorySlug = currentCategory ? currentCategory.name.toLowerCase().replace(/\s/g, '-') : '';
+
+  // --- Render Logic ---
+
+  if (loading) {
+    return (
+      <div className="w-full min-h-[600px] flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 to-white">
+        <Loader className="animate-spin text-green-600" size={48} />
+        <p className="ml-4 text-lg text-gray-700 mt-4 font-medium">Connecting to the farm...</p>
+      </div>
+    );
+  }
+
+  if (error || categories.length === 0) {
+    return (
+      <div className="w-full min-h-[600px] flex flex-col items-center justify-center p-8 text-red-600 bg-gradient-to-br from-red-50 to-orange-100 rounded-3xl shadow-xl max-w-[1400px] mx-auto my-16">
+        <Info size={48} className="mb-4" />
+        <p className="text-xl font-semibold">Data Loading Failed</p>
+        <p className="text-md text-gray-700 mt-2 text-center max-w-lg">
+            {error || "The server returned no categories. Please ensure your backend is running on `http://localhost:5000` and serving the `/api/categories` endpoint correctly."}
+        </p>
+        <button 
+            onClick={fetchCategories}
+            className="mt-6 px-8 py-3 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition-colors shadow-lg"
         >
-          <FaTimes />
+            Try Fetching Again
         </button>
+      </div>
+    );
+  }
 
-        <h2 className="text-2xl sm:text-3xl font-bold text-green-800 mb-6 text-center drop-shadow-sm">
-          {mainCategoryName} <span className="text-lime-600">Subcategories</span>
-        </h2>
+  return (
+    <div className="w-full bg-gradient-to-br from-green-50 to-white min-h-screen py-16 font-sans">
+      {/* Removed max-w-[1400px] mx-auto for full width, kept padding */}
+      <div className="w-full p-4 sm:p-6 lg:p-8">
+        {/* Reduced heading size: text-4xl sm:text-5xl -> text-3xl sm:text-4xl */}
+        <h1 className="text-3xl sm:text-4xl font-extrabold mb-4 text-center text-green-800">
+          Explore Our Organic Selections
+        </h1>
+        <p className="text-xl text-center text-gray-500 mb-12">
+          Find exactly what you need, from farm to table.
+        </p>
+        
+        <div className="flex flex-col lg:flex-row bg-white rounded-3xl shadow-[0_20px_50px_rgba(8,_112,_184,_0.2)] overflow-hidden border border-green-200/50 min-h-[600px]">
+          
+          {/* --- LEFT PANEL: Single Main Category Card with Carousel --- */}
+<div className="w-full lg:w-1/3 bg-gray-50 relative min-h-[250px] lg:min-h-full flex justify-center items-center p-4 overflow-visible">
+  <MainCategoryCard 
+    category={currentCategory}
+    categoryIndex={categoryIndex}
+    totalCategories={categories.length}
+    onNavigate={handleCategoryNavigation}
+  />
+</div>
 
-        {/* Subcategory Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5 md:gap-6">
-          {subcategories.map((sub) => (
-            <div
-              key={sub._id} // Use _id from MongoDB
-              className={`
-                flex flex-col items-center p-3 sm:p-4 rounded-[2rem] shadow-md cursor-pointer // More rounded, stronger shadow
-                bg-lime-100/60 backdrop-blur-sm border border-lime-200/70 // Themed background
-                transition-all duration-300 ease-in-out transform
-                hover:scale-[1.02] hover:shadow-lg active:scale-98 active:shadow-xl
-                ${visibleItems.includes(sub._id) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
-              `}
-              onClick={() => onSelectSubCategory(sub)}
-            >
-              {/* Image Container with Padding and object-contain */}
-              <div className="w-full h-28 sm:h-32 flex items-center justify-center overflow-hidden rounded-3xl mb-2 bg-green-100/40 p-2 border border-green-200/60"> {/* More rounded */}
-                <img
-                  src={sub.image || 'https://placehold.co/120x120/E0E0E0/333333?text=Subcategory'} // Fallback placeholder
-                  alt={sub.name}
-                  className="w-full h-full object-contain rounded-2xl transform transition-transform duration-300 group-hover:scale-105" // More rounded
-                  onError={(e) => { e.target.onerror = null; e.target.src = `https://placehold.co/120x120/E0E0E0/333333?text=${encodeURIComponent(sub.name.split(' ')[0])}`; }}
-                />
-              </div>
-              <p className="text-center text-sm sm:text-base font-semibold text-gray-800 leading-tight drop-shadow-sm">
-                {sub.name}
-              </p>
-              {/* If you add item counts to subcategories in your backend, display them here */}
-              {/* {sub.items && sub.items.length > 0 && (
-                <span className="text-lime-600 text-xs mt-1">({sub.items.length} items)</span>
-              )} */}
-            </div>
-          ))}
+
+
+          {/* --- RIGHT PANEL: Subcategory Grid --- */}
+          <div className="w-full lg:w-2/3 p-6 sm:p-10 bg-white overflow-y-auto max-h-[600px] lg:max-h-full">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentCategory._id + "content"}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+                className="h-full"
+              >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-green-100 pb-4 mb-8">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-2 sm:mb-0">
+                    <span className="text-green-600">Sub-categories</span> for {currentCategory.name}
+                  </h2>
+                  <Link 
+                    to={`/products?category=${mainCategorySlug}`} 
+                    className="flex items-center text-md font-semibold text-gray-500 hover:text-green-600 transition-colors"
+                  >
+                    All {currentCategory.name} <ChevronRight size={18} className="ml-1" />
+                  </Link>
+                </div>
+
+                {currentSubcategories.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+                    {currentSubcategories.map((sub) => (
+                      <SubCategoryItem 
+                        key={sub._id || sub.name}
+                        subcategory={sub}
+                        onClick={handleSelectSubCategory}
+                        mainCategorySlug={mainCategorySlug}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                    <Package size={56} className="text-green-300 mb-6" />
+                    <p className="text-2xl text-gray-600 font-medium">No Specific Subcategories</p>
+                    <p className="text-gray-500 mt-2">Check out all products in the **{currentCategory.name}** category.</p>
+                    <Link 
+                      to={`/products?category=${mainCategorySlug}`} 
+                      className="mt-6 px-8 py-3 bg-green-600 text-white rounded-full font-semibold hover:bg-green-700 transition-colors shadow-lg hover:shadow-green-500/50"
+                    >
+                      Browse {currentCategory.name} Collection
+                    </Link>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// --- Main ProductCategory Component ---
-const ProductCategory = () => {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedMainCategory, setSelectedMainCategory] = useState(null);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/categories');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        setCategories(data);
-      } catch (err) {
-        setError(err.message);
-        console.error("Error fetching categories:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCategories();
-  }, []);
-
-  const handleMainCategoryClick = (category) => { // Now receives the full category object
-    setSelectedMainCategory(category);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedMainCategory(null);
-  };
-
-  const handleSelectSubCategory = (subCategory) => {
-    console.log('Subcategory selected:', subCategory.name);
-    // Here you would typically navigate to a product listing page
-    // e.g., navigate(`/products?category=${selectedMainCategory.name}&subcategory=${subCategory.name}`);
-    handleCloseModal();
-  };
-
-  // React-slick settings for the carousel
-  const sliderSettings = {
-    dots: true,
-    infinite: true,
-    speed: 500,
-    slidesToShow: 4,
-    slidesToScroll: 1,
-    autoplay: true,
-    autoplaySpeed: 3000,
-    arrows: true,
-    responsive: [
-      { breakpoint: 1280, settings: { slidesToShow: 4, slidesToScroll: 1 } },
-      { breakpoint: 1024, settings: { slidesToShow: 3, slidesToScroll: 1 } },
-      { breakpoint: 768, settings: { slidesToShow: 2, slidesToScroll: 1, centerMode: true, centerPadding: '20px' } },
-      { breakpoint: 640, settings: { slidesToShow: 1.5, slidesToScroll: 1, centerMode: true, centerPadding: '20px' } },
-      { breakpoint: 480, settings: { slidesToShow: 1.2, slidesToScroll: 1, centerMode: true, centerPadding: '15px' } },
-    ],
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-fit flex items-center justify-center p-8 bg-gradient-to-br from-green-50 to-lime-100">
-        <Loader className="animate-spin text-lime-600" size={48} />
-        <p className="ml-4 text-lg text-gray-700">Loading Categories...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-fit flex flex-col items-center justify-center p-8 text-red-600 bg-gradient-to-br from-red-50 to-orange-100">
-        <FaTimes size={48} className="mb-4" />
-        <p className="text-lg font-semibold">Error loading categories: {error}</p>
-        <p className="text-sm text-gray-600 mt-2">Please ensure your backend is running and accessible.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-fit bg-gradient-to-br from-green-50 to-lime-100 font-sans text-gray-800 p-4 sm:p-6 md:p-8 relative pt-20"> {/* Removed min-h-screen, kept pt-20 for navbar clearance */}
-      <h1 className="text-3xl sm:text-4xl font-extrabold mb-8 text-center text-green-800 drop-shadow-sm">
-        Explore Our Farm-Fresh Categories
-      </h1>
-
-      {/* Main Category Carousel */}
-      <div className="carousel-container w-full px-4 sm:px-0">
-        <Slider {...sliderSettings}>
-          {categories.map((category) => (
-            <div key={category._id} className="p-2"> {/* Use _id from MongoDB */}
-              <MainCategoryCard
-                category={category}
-                onClick={handleMainCategoryClick}
-              />
-            </div>
-          ))}
-        </Slider>
-      </div>
-
-      {/* Subcategory Selection Modal */}
-      {isModalOpen && selectedMainCategory && (
-        <SubCategoryModal
-          mainCategoryName={selectedMainCategory.name}
-          subcategories={selectedMainCategory.subcategories}
-          onClose={handleCloseModal}
-          onSelectSubCategory={handleSelectSubCategory}
-        />
-      )}
-    </div>
-  );
-};
-
-export default ProductCategory;
+export default FullWidthCategoryExplorer;

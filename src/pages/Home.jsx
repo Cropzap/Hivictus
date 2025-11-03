@@ -8,6 +8,7 @@ import ProductCategory from '../components/ProductCategory';
 import BestSellingProducts from '../components/BestSellingProducts';
 
 import { Tractor, Leaf } from 'lucide-react'; // Using Lucide for icons
+import CategoryProductRows from '../components/CategoryProductRows';
 
 function Home() {
   return (
@@ -34,6 +35,9 @@ function Home() {
       {/* Product Categories */}
       <section className="relative z-10 animate-fade-in-up mt-4">
         <ProductCategory />
+      </section>
+      <section className="relative z-10 animate-fade-in-up mt-4">
+        <CategoryProductRows/>
       </section>
 
       {/* Best Selling Products */}
