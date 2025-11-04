@@ -212,7 +212,7 @@ const Footer = () => {
                     href="mailto:support@shopname.com" 
                     className="hover:text-emerald-400 transition-colors duration-200"
                   >
-                    .com
+                    info@hivictus.com
                   </a>
               </li>
             </ul>

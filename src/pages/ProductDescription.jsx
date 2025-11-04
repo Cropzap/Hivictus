@@ -1,13 +1,20 @@
+// ProductDescription.jsx - FULL CODE
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaStar, FaStarHalfAlt, FaRegStar,
-  FaShoppingCart, FaTimes, FaArrowLeft, FaRulerCombined
+  FaShoppingCart, FaTimes, FaArrowLeft
 } from 'react-icons/fa';
 import { Loader, Check, X } from 'lucide-react';
 import { useCart } from '../context/CartContext'; // Import useCart hook
-const API_URL = import.meta.env.VITE_API_URL;
+
+const API_URL = import.meta.env.VITE_API_URL; 
+
+// Fallback Image URL Constant
+const FALLBACK_IMAGE_URL = 'https://placehold.co/450x450/E0E0E0/333333?text=Product Image';
+
 // Star Rendering Component
 const renderStars = (rating) => {
   const stars = [];
@@ -16,7 +23,6 @@ const renderStars = (rating) => {
     else if (rating >= i - 0.5) stars.push(<FaStarHalfAlt key={i} className="text-yellow-500" />);
     else stars.push(<FaRegStar key={i} className="text-gray-300" />);
   }
-  // Mobile text size reduced for cleanliness
   return <div className="flex text-xs sm:text-sm">{stars}</div>;
 };
 
@@ -40,7 +46,6 @@ const PriceAndQuantity = ({ product, selectedQuantity, handleQuantityChange, qua
         id="quantity"
         value={selectedQuantity}
         onChange={handleQuantityChange}
-        // Reduced text size in select dropdown for mobile
         className="p-2 border border-gray-300 rounded-lg bg-white focus:ring-green-500 focus:border-green-500 text-gray-800 shadow-sm text-sm"
         disabled={product.quantity === 0}
       >
@@ -65,9 +70,8 @@ const ProductDescription = () => {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
-  const [selectedImage, setSelectedImage] = useState(null); // New state for image gallery
+  const [selectedImage, setSelectedImage] = useState(FALLBACK_IMAGE_URL); 
 
-  // Consume cart context
   const { fetchCartQuantity } = useCart();
 
   const showToastMessage = useCallback((message, type = 'success') => {
@@ -101,15 +105,16 @@ const ProductDescription = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        setProduct(data);
         
-        // Ensure data.images is an array, or fall back to single imageUrl
-        const images = data.images && Array.isArray(data.images) && data.images.length > 0
-          ? data.images
-          : [data.imageUrl || 'https://placehold.co/450x450/E0E0E0/333333?text=Product Image'];
+        // --- 🔑 IMAGE FIX: Use 'imageUrls' from your data format 🔑 ---
+        const images = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
+          ? data.imageUrls
+          : [data.imageUrl || FALLBACK_IMAGE_URL]; 
         
         data.images = images; 
-        setSelectedImage(images[0]); // Set the first image as selected
+        setSelectedImage(images[0] || FALLBACK_IMAGE_URL); 
+        setProduct(data);
+
       } catch (err) {
         setError(err.message);
         console.error("Error fetching product details:", err);
@@ -139,7 +144,8 @@ const ProductDescription = () => {
         },
         body: JSON.stringify({ productId: product._id, quantity: selectedQuantity }),
       });
-
+      
+      // Line 142 refers to the POST request above
       if (!response.ok) {
         if (response.status === 401) {
           showToastMessage('Session expired. Please log in again.', 'error');
@@ -147,10 +153,15 @@ const ProductDescription = () => {
           localStorage.removeItem('userData');
           navigate('/login');
         } else {
+          // Robust error parsing for the backend's JSON error response
           const errorData = await response.json();
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+          const errorMessage = errorData.detail || errorData.message || `Server Error (Status: ${response.status})`;
+          
+          // Line 163 (where the error originates)
+          throw new Error(errorMessage); 
         }
       }
+      // Line 171 is the handleAddToCart call site
 
       showToastMessage(`${selectedQuantity} ${product.unit} of ${product.name} added to cart!`);
       fetchCartQuantity();
@@ -159,7 +170,7 @@ const ProductDescription = () => {
       showToastMessage(`Failed to add to cart: ${err.message}`, 'error');
     }
   };
-
+  
   const handleQuantityChange = (e) => {
     setSelectedQuantity(parseInt(e.target.value));
   };
@@ -174,6 +185,7 @@ const ProductDescription = () => {
     hidden: { opacity: 0, y: 100 },
     visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } },
   };
+
 
   if (loading) {
     return (
@@ -223,12 +235,10 @@ const ProductDescription = () => {
   const priceAndQuantityProps = { product, selectedQuantity, handleQuantityChange, quantityOptions };
 
   return (
-    // Main div set to w-full for full-width layout
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      // Full-width background for attractive desktop UI
       className="w-full min-h-screen bg-white lg:bg-gradient-to-br lg:from-green-50 lg:to-lime-100 font-sans text-gray-800 pb-20 lg:pb-12"
     >
       
@@ -264,17 +274,17 @@ const ProductDescription = () => {
           
           {/* Main Image with Transition */}
           <motion.img
-            key={selectedImage} // Key prop forces re-render/animation on image change
+            key={selectedImage} 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 }}
             src={selectedImage}
             alt={product.name}
             className="w-full max-h-[450px] object-contain rounded-lg shadow-md"
-            onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/450x450/E0E0E0/333333?text=Product Image'; }}
+            onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_IMAGE_URL; }}
           />
           
-          {/* Thumbnail Carousel - Using product.images array */}
+          {/* Thumbnail Carousel - Using product.images array (Base64 URLs) */}
           <div className="flex justify-center gap-3 mt-6 overflow-x-auto py-2 px-4 scrollbar-hide">
             {product.images && product.images.map((image, index) => (
               <motion.div
@@ -287,7 +297,7 @@ const ProductDescription = () => {
                 }`}
               >
                 <img
-                  src={image}
+                  src={image} 
                   alt={`${product.name} thumbnail ${index + 1}`}
                   className="w-full h-full object-cover"
                   onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/80x80/E0E0E0/333333?text=Thumb'; }}
@@ -410,7 +420,7 @@ const ProductDescription = () => {
                 </div>
                 <motion.button
                     onClick={handleAddToCart}
-                    whileTap={{ scale: 0.95 }} // Pop animation
+                    whileTap={{ scale: 0.95 }} 
                     className={`
                       flex items-center justify-center flex-1 px-4 py-3 rounded-full text-white font-semibold text-base shadow-lg
                       transition-all duration-300 ease-in-out transform

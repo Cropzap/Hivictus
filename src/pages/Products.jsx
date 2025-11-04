@@ -14,10 +14,13 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css'; // Import toast styles
+import 'react-toastify/dist/ReactToastify.css';
 
 // API Base URL (Configure this based on your backend environment)
 const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+// Fallback Image URL Constant
+const FALLBACK_IMAGE_URL = 'https://placehold.co/400x400/E5E7EB/9CA3AF?text=Product';
 
 // ====================================================================
 // --- Utility Functions for URL Slugs ---
@@ -66,7 +69,7 @@ const normalizeFilterName = (name) => {
 // --- Utility Components (ProductCard, PriceUnit, etc.) ---
 // ====================================================================
 
-// Star Rendering Component (Reduced size to 10)
+// Star Rendering Component
 const renderStars = (rating) => {
   const stars = [];
   const fullStars = Math.floor(rating);
@@ -133,7 +136,8 @@ const ProductCard = ({ product }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
+          // Note: Assuming your auth middleware accepts 'x-auth-token' or 'Authorization: Bearer'
+          'x-auth-token': authToken, 
         },
         body: JSON.stringify({ productId: product._id, quantity: 1 }),
       });
@@ -145,6 +149,8 @@ const ProductCard = ({ product }) => {
       }
 
       toast.success(`${product.name} added to cart!`);
+      // Note: In a full app, you'd also want to trigger a cart context refresh here
+      // For simplicity, this is omitted if the context isn't fully set up.
 
     } catch (err) {
       console.error('Error adding to cart from ProductCard:', err);
@@ -168,6 +174,13 @@ const ProductCard = ({ product }) => {
       : product.description)
     : 'Fresh and organic produce';
 
+  // --- 🔑 IMAGE FIX START 🔑 ---
+  // Priority: 1. imageUrls[0] (Base64 data URL) 2. imageUrl 3. FALLBACK_IMAGE_URL
+  const displayImageUrl = product.imageUrls && product.imageUrls.length > 0
+    ? product.imageUrls[0]
+    : product.imageUrl || FALLBACK_IMAGE_URL;
+  // --- 🔑 IMAGE FIX END 🔑 ---
+
   return (
     <motion.div
       className="relative bg-white rounded-xl shadow-lg transition-all duration-300 flex flex-col group border border-gray-100 hover:border-green-400 h-96"
@@ -181,12 +194,12 @@ const ProductCard = ({ product }) => {
         {/* Product Image */}
         <div className="relative w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden">
           <img
-            src={product.imageUrl || 'https://placehold.co/400x400/E5E7EB/9CA3AF?text=Product'}
+            src={displayImageUrl} // Use the resolved image URL
             alt={product.name}
             className="object-cover w-full h-full transition-transform duration-500 ease-out group-hover:scale-110"
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = 'https://placehold.co/400x400/E5E7EB/9CA3AF?text=Product';
+              e.target.src = FALLBACK_IMAGE_URL; // Fallback on error
             }}
           />
           {/* Out of Stock Badge */}
@@ -270,6 +283,7 @@ const FilterContent = ({
   allCategories,
   allTypes,
   getSubcategoriesForSelectedCategory,
+  closeFilterPanel, // New prop for mobile
 }) => {
 
     const maxPrice = filters.priceRange[1] > filters.priceRange[0] ? filters.priceRange[1] : filters.priceRange[0];
@@ -404,6 +418,15 @@ const FilterContent = ({
         </select>
       </div>
 
+      {/* Mobile-specific button to close and apply filters */}
+      <button
+        onClick={closeFilterPanel}
+        className="lg:hidden w-full bg-green-600 text-white px-3 py-3 rounded-lg flex items-center justify-center font-bold text-base shadow-md hover:bg-green-700 transition-colors mt-6"
+      >
+        Apply Filters
+      </button>
+      
+      {/* Universal Reset button */}
       <button
         onClick={resetFilters}
         className="w-full bg-red-500 text-white px-3 py-2 rounded-lg flex items-center justify-center font-bold text-sm shadow-md hover:bg-red-600 transition-colors mt-3"
@@ -468,6 +491,8 @@ const CategoriesBar = ({ categories, onSelect, selectedCategory }) => {
                                 src={category.mainImage || 'https://placehold.co/100x100/E5E7EB/6B7280?text=Cat'}
                                 alt={category.name}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                // Add onError for category images as well
+                                onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/100x100/E5E7EB/6B7280?text=Cat'; }}
                             />
                         </div>
                         <span className="mt-1 text-xs font-semibold capitalize whitespace-nowrap">
@@ -507,41 +532,33 @@ const Products = () => {
   const [categories, setCategories] = useState([]);
   const [allTypes, setAllTypes] = useState([]);
 
+  // Get initial values from URL on load
+  const initialCategory = cleanName(searchParams.get('category'));
+  const initialSubCategory = cleanName(searchParams.get('subcategory'));
+
   const [localFilters, setLocalFilters] = useState({
     type: 'All',
     // priceRange initialized with a safe default, max will be set after fetch
     priceRange: [0, 100],
-    minRating: 0, // Not currently used in FilterContent/applyFilters but kept for future use
+    minRating: 0, 
     searchQuery: '',
     sortBy: 'default',
   });
 
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
-  // --- Dynamic URL Derived Filters ---
-  // The cleanName function converts the URL slug back to the name with spaces (e.g., 'Fresh Vegetables')
-  const categoryFromUrl = cleanName(searchParams.get('category'));
-  const subCategoryFromUrl = cleanName(searchParams.get('subcategory'));
-
+  // Combine local state filters with URL-derived filters
   const currentFilters = useMemo(() => ({
     ...localFilters,
-    // These values are derived from URL slugs, but are the CLEAN NAMEs with spaces
-    category: categoryFromUrl,
-    subCategory: subCategoryFromUrl,
-  }), [localFilters, categoryFromUrl, subCategoryFromUrl]);
+    category: initialCategory, // Always read from URL
+    subCategory: initialSubCategory, // Always read from URL
+  }), [localFilters, initialCategory, initialSubCategory]);
   // ------------------------------------
-
-  // Memoized list of all unique category names (including 'All') for dropdown/bar
-  const allCategoryNames = useMemo(() => {
-    return ['All', ...categories.map(c => c.name)];
-  }, [categories]);
-
 
   // Helper to get subcategories for the currently selected main category
   const getSubcategoriesForSelectedCategory = useCallback(() => {
     const selectedCat = categories.find(c => c.name === currentFilters.category);
     if (selectedCat && selectedCat.subcategories) {
-      // Assuming subcategory names in the product data match the names in the category data
       return ['All', ...selectedCat.subcategories.map(sc => sc.name)];
     }
     return ['All'];
@@ -581,17 +598,15 @@ const Products = () => {
           ...p,
           // Safely access seller name
           sellerName: p.sellerId?.sellerName || p.sellerId?.companyName || 'Local Farm',
-          // Ensure rating and reviewCount are numbers
           rating: p.rating !== undefined ? parseFloat(p.rating) : 5.0,
           reviewCount: p.reviewCount !== undefined ? parseInt(p.reviewCount, 10) : 0,
-          // Ensure category is an object with a name property
           category: p.category && typeof p.category === 'object' ? p.category : { name: 'Unknown' },
         }));
 
         setAllProducts(productsWithParsedData);
 
         // Determine the maximum price for the initial price range
-        const maxPrice = productsWithParsedData.reduce((max, p) => Math.max(max, p.price), 0);
+        const maxPrice = productsWithParsedData.reduce((max, p) => Math.max(max, p.price || 0), 0);
 
         setLocalFilters((prev) => {
             const currentMax = prev.priceRange[1];
@@ -649,11 +664,11 @@ const Products = () => {
 
     // 4. Price Range Filter
     temp = temp.filter((p) =>
-        p.price >= currentFilters.priceRange[0] &&
-        p.price <= currentFilters.priceRange[1]
+        (p.price || 0) >= currentFilters.priceRange[0] &&
+        (p.price || 0) <= currentFilters.priceRange[1]
     );
 
-    // 5. Min Rating Filter (If we were to add it to the UI/logic)
+    // 5. Min Rating Filter
     if (currentFilters.minRating > 0) {
       temp = temp.filter((p) => p.rating >= currentFilters.minRating);
     }
@@ -674,13 +689,13 @@ const Products = () => {
     // 7. Sort
     switch (currentFilters.sortBy) {
       case 'price-asc':
-        temp.sort((a, b) => a.price - b.price);
+        temp.sort((a, b) => (a.price || 0) - (b.price || 0));
         break;
       case 'price-desc':
-        temp.sort((a, b) => b.price - a.price);
+        temp.sort((a, b) => (b.price || 0) - (a.price || 0));
         break;
       case 'rating-desc':
-        temp.sort((a, b) => b.rating - a.rating);
+        temp.sort((a, b) => (b.rating || 0) - (a.rating || 0));
         break;
       default:
         // No sort or default is 'best match' (which is the order from the API)
@@ -722,6 +737,10 @@ const Products = () => {
         if (name === 'category') {
              // Reset subcategory if the main category changes
              delete newParams.subcategory;
+             // If category is set to 'All', ensure subCategory state is 'All' immediately
+             if (value === 'All') {
+                 setLocalFilters(prev => ({ ...prev, subCategory: 'All' }));
+             }
         }
 
         setSearchParams(newParams);
@@ -761,6 +780,8 @@ const Products = () => {
         }
     };
     handleFilterChange(mockEvent);
+    // Close the filter panel on mobile when selecting from the bar
+    if (isFilterPanelOpen) setIsFilterPanelOpen(false);
   };
 
   const resetFilters = () => {
@@ -775,6 +796,10 @@ const Products = () => {
     // Clear URL search parameters
     setSearchParams({});
     setIsFilterPanelOpen(false); // Close the filter panel on reset
+  };
+  
+  const closeFilterPanel = () => {
+    setIsFilterPanelOpen(false);
   };
 
   // --- UI Rendering ---
@@ -792,6 +817,16 @@ const Products = () => {
         >
           <RefreshCcw size={16} className="inline mr-2" /> Try Again
         </button>
+      </div>
+    );
+  }
+  
+  // Display loading state
+  if (loading && allProducts.length === 0) {
+    return (
+      <div className="container mx-auto p-4 text-center mt-20">
+        <Loader size={36} className="animate-spin text-green-600 mx-auto mb-4" />
+        <p className="text-lg text-gray-700">Loading fresh products...</p>
       </div>
     );
   }
@@ -841,6 +876,7 @@ const Products = () => {
                 allCategories={categories}
                 allTypes={allTypes}
                 getSubcategoriesForSelectedCategory={getSubcategoriesForSelectedCategory}
+                closeFilterPanel={closeFilterPanel} // Pass the closer for mobile but ignore on desktop
               />
             </div>
 
@@ -852,80 +888,81 @@ const Products = () => {
                   animate={{ x: 0 }}
                   exit={{ x: '100%' }}
                   transition={{ type: 'tween', duration: 0.3 }}
-                  className="fixed inset-0 z-50 bg-white p-6 overflow-y-auto lg:hidden"
+                  className="fixed inset-0 z-50 bg-white lg:hidden overflow-y-auto p-4"
                 >
-                  <div className="flex justify-between items-center mb-6 border-b pb-3">
-                    <h2 className="text-2xl font-bold text-gray-800">Filters</h2>
-                    <motion.button
-                      onClick={() => setIsFilterPanelOpen(false)}
-                      className="text-gray-500 hover:text-gray-800 p-2"
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <X size={24} />
-                    </motion.button>
-                  </div>
-                  <FilterContent
-                    handleFilterChange={handleFilterChange}
-                    handlePriceRangeChange={handlePriceRangeChange}
-                    resetFilters={resetFilters}
-                    filters={currentFilters}
-                    allCategories={categories}
-                    allTypes={allTypes}
-                    getSubcategoriesForSelectedCategory={getSubcategoriesForSelectedCategory}
-                  />
+                    <div className="flex justify-between items-center border-b pb-3 mb-4 sticky top-0 bg-white z-10">
+                        <h2 className="text-2xl font-bold text-gray-800">
+                            <Filter size={24} className="inline mr-2 text-green-500" /> Filters
+                        </h2>
+                        <button onClick={() => setIsFilterPanelOpen(false)} className="p-2 rounded-full hover:bg-gray-100 text-gray-700">
+                            <X size={24} />
+                        </button>
+                    </div>
+                    <div className="pb-20"> {/* Padding for fixed 'Apply Filters' button */}
+                        <FilterContent
+                            handleFilterChange={handleFilterChange}
+                            handlePriceRangeChange={handlePriceRangeChange}
+                            resetFilters={resetFilters}
+                            filters={currentFilters}
+                            allCategories={categories}
+                            allTypes={allTypes}
+                            getSubcategoriesForSelectedCategory={getSubcategoriesForSelectedCategory}
+                            closeFilterPanel={closeFilterPanel} // Use this to close the panel after applying
+                        />
+                    </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </aside>
 
-          {/* Products Grid */}
+          {/* Product Grid */}
           <main className="lg:w-3/4">
-            <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-700">
-                    Showing <span className="font-extrabold text-green-600">{filteredProducts.length}</span> Results
-                </h2>
-                {/* Desktop Sort Dropdown (re-using the same component) */}
-                <div className="hidden sm:block w-48">
-                    <label htmlFor="sortBy" className="sr-only">Sort By</label>
-                    <select
-                        id="sortBy"
-                        name="sortBy"
-                        value={currentFilters.sortBy}
-                        onChange={handleFilterChange}
-                        className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
-                    >
-                        <option value="default">Best Match</option>
-                        <option value="price-asc">Price: Low to High</option>
-                        <option value="price-desc">Price: High to Low</option>
-                        <option value="rating-desc">Rating: High to Low</option>
-                    </select>
-                </div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-700">
+                {filteredProducts.length} Results
+                {currentFilters.category !== 'All' && ` for "${currentFilters.category}"`}
+              </h2>
+              {/* Desktop Sort Selector (Hidden on Mobile, already in filter panel) */}
+              <div className="hidden lg:flex items-center space-x-2">
+                <label htmlFor="sortByDesktop" className="text-sm font-medium text-gray-600">Sort By:</label>
+                <select
+                  id="sortByDesktop"
+                  name="sortBy"
+                  value={currentFilters.sortBy}
+                  onChange={handleFilterChange}
+                  className="p-2 border border-gray-300 rounded-lg bg-white text-sm"
+                >
+                  <option value="default">Best Match</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="rating-desc">Rating: High to Low</option>
+                </select>
+              </div>
             </div>
-
-            {loading ? (
-              <div className="grid place-items-center h-48 bg-white rounded-xl shadow-lg">
-                <Loader size={36} className="animate-spin text-green-600" />
-                <p className="text-gray-500 mt-2">Loading fresh produce...</p>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="bg-yellow-50 p-6 rounded-xl shadow-lg text-center border border-yellow-200">
-                <p className="text-xl font-semibold text-yellow-800">
-                  No products found!
-                </p>
-                <p className="text-yellow-700 mt-2">
-                  Try adjusting your filters or <button onClick={resetFilters} className="text-red-500 font-bold hover:underline">resetting them</button>.
-                </p>
-                
-              </div>
-            ) : (
-              <motion.div
+            
+            {filteredProducts.length > 0 ? (
+                <motion.div
                 layout
                 className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6"
               >
-                {filteredProducts.map((p) => (
-                  <ProductCard key={p._id} product={p} />
-                ))}
+                <AnimatePresence>
+                  {filteredProducts.map((product) => (
+                    <ProductCard key={product._id} product={product} />
+                  ))}
+                </AnimatePresence>
               </motion.div>
+            ) : (
+                <div className="text-center p-12 bg-white rounded-xl shadow-lg mt-10">
+                    <Search size={48} className="text-gray-400 mx-auto mb-4" />
+                    <p className="text-xl font-semibold text-gray-600">No products found matching your filters.</p>
+                    <p className="text-sm text-gray-500 mt-2">Try adjusting your price range, category, or search query.</p>
+                    <button
+                        onClick={resetFilters}
+                        className="mt-6 bg-green-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-600 transition-colors"
+                    >
+                        Reset All Filters
+                    </button>
+                </div>
             )}
           </main>
         </div>
