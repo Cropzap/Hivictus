@@ -592,7 +592,7 @@ const UserProfileDashboard = () => {
           </div>
 
           {/* Last Activities section from original code */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 w-full">
+          {/* <div className="bg-white rounded-2xl shadow-lg p-6 w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Last Activities</h2>
               <a href="#" className="text-emerald-600 hover:text-emerald-800 font-semibold text-sm transition-colors">See All</a>
@@ -607,7 +607,7 @@ const UserProfileDashboard = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Right Column (Main Content Area - Tabs) */}

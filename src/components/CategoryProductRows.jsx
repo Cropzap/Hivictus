@@ -12,15 +12,6 @@ const toast = {
   error: (message) => console.error('TOAST ERROR:', message),
 };
 
-// --- MOCK LINK Component (Replaces useNavigate for single-file deployment) ---
-/**
- * Simulates the functionality of a react-router-dom <Link to="..."> component.
- * It prevents default navigation and logs the destination path.
- */
-
-
-// ------------------------------------------------------------------------
-
 // --- Icons as SVG components ---
 const SpinnerIcon = (props) => (
   <svg {...props} className="animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
@@ -60,17 +51,39 @@ const ProductCard = ({ product, onAddToCart }) => {
     e.target.src = 'https://placehold.co/400x400/F3F4F6/9CA3AF?text=Product';
   };
 
-  // Use product._id if available, falling back to product.id
   const productId = product._id || product.id; 
-
-  // Safely display the category name.
+const FALLBACK_IMAGE_URL = 'https://placehold.co/400x400/E5E7EB/9CA3AF?text=Product';
   const displayCategory = typeof product.category === 'object' && product.category !== null 
     ? product.category.name || 'Unknown Category' 
     : product.category;
 
+  // **UPDATE 1: Logic to get the first base64 image**
+  const firstBase64Image = useMemo(() => {
+    // Check if `product.images` exists, is an array, and has at least one element
+    if (Array.isArray(product.images) && product.images.length > 0) {
+      const base64Data = product.images[0];
+      // Check if the data is a string and prepend the data URI header if it's missing
+      // Assuming images are commonly JPEG or PNG. You may need to adjust the mime type.
+      if (typeof base64Data === 'string' && base64Data.length > 0) {
+        // If the string doesn't start with 'data:image', assume it's raw base64 and prepend.
+        // It's common for base64 strings from a backend to be just the raw data.
+        if (!base64Data.startsWith('data:image')) {
+            // Default to 'image/jpeg' or 'image/png'. You may need to check your backend format.
+            return `data:image/jpeg;base64,${base64Data}`; 
+        }
+        return base64Data; // Already correctly formatted data URI
+      }
+    }
+    // Fallback to the product.imageUrl or a placeholder if no valid base64 image is found
+    return product.imageUrl || 'https://placehold.co/400x400/50C878/FFFFFF?text=Product';
+  }, [product.images, product.imageUrls]);
+
+  const displayImageUrl = product.imageUrls && product.imageUrls.length > 0
+    ? product.imageUrls[0]
+    : product.imageUrl || FALLBACK_IMAGE_URL;
+
   return (
     <motion.div
-      // NOTE: Removed onClick and cursor-pointer from the card itself, as the parent <Link> wrapper now handles navigation/interaction
       className="relative bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-300 flex flex-col group border border-gray-200 hover:shadow-2xl hover:border-emerald-300 w-52 sm:w-64 flex-shrink-0 h-[380px]"
       layout
       initial={{ opacity: 0, scale: 0.95 }}
@@ -80,8 +93,9 @@ const ProductCard = ({ product, onAddToCart }) => {
     >
       <div className="flex flex-col h-full">
         <div className="relative w-full h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
+          {/* **UPDATE 1: Use the calculated base64/URL image source** */}
           <img
-            src={product.imageUrl || 'https://placehold.co/400x400/50C878/FFFFFF?text=Product'}
+            src={displayImageUrl}
             alt={product.name}
             className="object-cover w-full h-full transition-transform duration-300 ease-out group-hover:scale-110"
             onError={handleImageError}
@@ -134,9 +148,6 @@ const ProductCard = ({ product, onAddToCart }) => {
 
 // --- Main Component: CategoryProductRows ---
 const CategoryProductRows = () => {
-  // Removed const navigate = useNavigate();
-  
-  // State now stores an array of objects: [{ categoryName: '...', products: [...] }]
   const [categoryData, setCategoryData] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -149,7 +160,7 @@ const CategoryProductRows = () => {
    */
   const loadData = useCallback(async () => {
     setLoading(true);
-    setError(null); // Clear previous errors
+    setError(null);
 
     try {
       // 1. FETCH CATEGORIES DYNAMICALLY
@@ -173,25 +184,22 @@ const CategoryProductRows = () => {
       const successfullyMappedCategoryKeys = []; 
       
       categories.forEach(cat => {
-        // Handle both string array or object array format, checking for null/undefined safely
         const originalCategoryName = typeof cat === 'string' ? cat : cat?.name;
         
         if (originalCategoryName != null) {
-            // Explicitly cast to string, then normalize (trim whitespace and convert to lowercase)
             const categoryString = String(originalCategoryName); 
             const normalizedKey = categoryString.trim().toLowerCase();
             
-            if (normalizedKey) { // Only map non-empty keys
+            if (normalizedKey) {
                 categoryMap.set(normalizedKey, { 
-                    categoryName: categoryString, // Use the string value for display
+                    categoryName: categoryString,
                     products: [] 
                 });
-                successfullyMappedCategoryKeys.push(normalizedKey); // Log the key used for matching
+                successfullyMappedCategoryKeys.push(normalizedKey);
             }
         }
       });
 
-      // Log the keys successfully mapped from the /categories endpoint
       console.log('DEBUG INFO: Successfully Mapped Category Keys (Normalized from /categories):', successfullyMappedCategoryKeys);
 
       // Distribute products into their respective category groups
@@ -202,42 +210,34 @@ const CategoryProductRows = () => {
         
         // --- LOGIC TO HANDLE OBJECTS IN product.category ---
         if (typeof rawCategoryName === 'object' && rawCategoryName !== null) {
-            // Check for common properties like 'name' or 'categoryName'
             if (rawCategoryName.name) {
                 rawCategoryName = rawCategoryName.name;
             } else if (rawCategoryName.categoryName) {
                 rawCategoryName = rawCategoryName.categoryName;
             } else {
-                // If it's an object but we can't extract a name, force a string representation for logging failure
                 rawCategoryName = '[object object] (unextractable)';
             }
         }
         // --- END OBJECT HANDLING LOGIC ---
         
-        // Check for null or undefined categories or the unextractable marker
         if (rawCategoryName != null && rawCategoryName !== '[object object] (unextractable)') { 
-            // FIX: Explicitly convert to string before normalization
             const categoryString = String(rawCategoryName);
             const normalizedProductCategory = categoryString.trim().toLowerCase();
             
-            if (normalizedProductCategory) { // Only attempt lookup if the key is non-empty
+            if (normalizedProductCategory) {
                 const group = categoryMap.get(normalizedProductCategory);
                 
-                // Add the product if a matching (normalized) category group exists
                 if (group) {
                   group.products.push(product);
                 } else {
-                  // Add the normalized category for debugging
                   unmatchedCategories.add(normalizedProductCategory);
                 }
             }
         } else if (rawCategoryName === '[object object] (unextractable)') {
-             // Specifically log the unextractable object case
              unmatchedCategories.add(rawCategoryName);
         }
       });
 
-      // Log diagnostics for categories that failed to match
       if (unmatchedCategories.size > 0) {
           console.warn(
               'DEBUG WARNING: The following product categories (normalized) exist in your products but DID NOT MATCH any category (normalized) fetched from /categories (Check spelling/casing/matching logic or if product.category is an object without a "name" property):', 
@@ -245,13 +245,11 @@ const CategoryProductRows = () => {
           );
       }
       
-      // Convert map values to an array, filtering out empty categories
       const finalGroupedData = Array.from(categoryMap.values()).filter(g => g.products.length > 0);
       
       setCategoryData(finalGroupedData);
       
       if (finalGroupedData.length === 0) {
-         // This is the line that triggers the TOAST ERROR
          toast.error('No products matched the categories fetched from the backend. Check console for unmatched category names.');
       } else {
          toast.success('Categories and products loaded successfully!');
@@ -259,7 +257,6 @@ const CategoryProductRows = () => {
 
     } catch (err) {
       console.error('Error during data fetching:', err);
-      // Provide detailed error feedback to the user
       setError(`Data Loading Error: ${err.message}. Please verify both /categories and /products endpoints are working on ${API_BASE_URL}.`);
       toast.error('Failed to load data. Check backend connection.');
     } finally {
@@ -271,18 +268,19 @@ const CategoryProductRows = () => {
     loadData();
   }, [loadData]);
 
+  // **UPDATE 2: Cart Logic Implementation (already mostly correct, but confirming)**
   /**
    * Handler for adding a product to the cart.
    * @param {string} productId - The ID of the product to add.
    */
   const handleAddToCart = async (productId) => {
+    // **This is the core Cart Logic:**
     if (!authToken) {
       toast.error('Please log in to add items to your cart.');
-      // NOTE: In a real app, this would be navigation, e.g., navigate('/login');
+      // In a real app, you would navigate the user to the login page here.
       return;
     }
     
-    // Find the product name for the success toast message
     let productName = 'Product';
     for (const group of categoryData) {
         const product = group.products.find(p => (p._id || p.id) === productId);
@@ -293,31 +291,34 @@ const CategoryProductRows = () => {
     }
 
     try {
+      // **API Call to add the product to the cart**
       const response = await fetch(`${API_BASE_URL}/cart/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // Assuming an Authorization header with a Bearer token is needed
           'Authorization': `Bearer ${authToken}`, 
         },
-        body: JSON.stringify({ productId, quantity: 1 }),
+        body: JSON.stringify({ productId, quantity: 1 }), // Adds one unit of the product
       });
 
       if (!response.ok) {
         let errorData = { message: `Failed to add ${productName} to cart. Status: ${response.status}` };
         try {
-          // Attempt to parse JSON error message from backend
           errorData = await response.json();
         } catch (e) {
-          // Ignore if response is not JSON
+          // Response was not JSON, use the default error message
         }
         
         if (response.status === 401) {
             toast.error('Session expired. Please log in again.');
         } else {
+            // Throw a general error to be caught below
             throw new Error(errorData.message || 'Unknown server error.');
         }
       }
 
+      // Success notification
       toast.success(`${productName} added to cart successfully!`);
       console.log(`Product ID ${productId} added to cart.`);
     } catch (err) {
@@ -326,7 +327,6 @@ const CategoryProductRows = () => {
     }
   };
 
-  // NOTE: The handleProductClick function is removed as Link now handles the navigation wrapper.
 
   if (loading) {
     return (
@@ -374,7 +374,6 @@ const CategoryProductRows = () => {
             <h3 className="text-2xl font-bold text-gray-800">
               {categoryGroup.categoryName}
             </h3>
-            {/* Replaced button with Link component */}
             <Link
               to={`/category/${categoryGroup.categoryName.replace(/\s/g, '-')}`}
               className="text-emerald-600 hover:text-emerald-800 font-semibold transition-colors text-sm sm:text-base focus:outline-none cursor-pointer"
@@ -399,10 +398,9 @@ const CategoryProductRows = () => {
               }
             `}</style>
             
-            {categoryGroup.products.slice(0, 10).map((product) => ( // Limiting to 10 products per row
-              // Wrapped ProductCard with Link for navigation
+            {categoryGroup.products.slice(0, 10).map((product) => (
               <Link 
-                key={product._id || product.id} // Use the unique ID from the backend
+                key={product._id || product.id}
                 to={`/product/${product._id || product.id}`}
                 className=" cursor-pointer"
               >
@@ -412,14 +410,10 @@ const CategoryProductRows = () => {
                 />
               </Link>
             ))}
-            {/* Spacer card for better look at the end of the scroll */}
             <div className="w-4 flex-shrink-0"></div> 
           </div>
         </motion.div>
       ))}
-
-      {/* Note for the User (Toast library replacement) */}
-      
     </div>
   );
 };

@@ -9,10 +9,11 @@ import {
   ShieldCheck, 
   Mail, 
   Loader, 
+  Youtube,
 } from 'lucide-react';
 
 // --- Configuration and Helper Functions ---
-const CATEGORIES_API_URL = 'http://localhost:5000/api/categories';
+const CATEGORIES_API_URL = 'https://api.hivictus.com/api/categories';
 const DISPLAY_CATEGORY_COUNT = 5; // Display only the first 5 categories in the footer
 
 // Helper to convert text to a URL-friendly slug
@@ -26,7 +27,7 @@ const mapLinkToRoute = (text) => {
   if (slug.includes('privacy-policy')) return '/privacy-policy';
   if (slug.includes('terms-and-conditions')) return '/terms-and-conditions';
   if (slug.includes('faq')) return '/faq';
-  if (slug.includes('about-us')) return '/about';
+  if (slug.includes('about-us')) return 'https://www.hivictus.com/our-story';
   if (slug.includes('contact-us') || slug.includes('support')) return '/support'; 
   
   // Default mapping
@@ -36,8 +37,7 @@ const mapLinkToRoute = (text) => {
 // --- Static Link Data (As in your original component) ---
 const CompanyLinks = [
   { text: 'About Us', link: mapLinkToRoute('About Us') }, 
-  { text: 'Careers', link: mapLinkToRoute('Careers') }, 
-  { text: 'Blog', link: mapLinkToRoute('Blog') }, 
+  { text: 'Products', link: mapLinkToRoute('products') }, 
   { text: 'Orders', link: mapLinkToRoute('Orders') },
 ];
 
@@ -49,8 +49,8 @@ const CustomerServiceLinks = [
 ];
 
 const FeatureLinks = [
-  { text: 'Express Delivery', link: mapLinkToRoute('Express Delivery'), icon: Truck }, 
-  { text: 'Security & Trust', link: mapLinkToRoute('Security'), icon: ShieldCheck },
+  { text: 'Express Delivery', link: mapLinkToRoute(''), icon: Truck }, 
+  { text: 'Security & Trust', link: mapLinkToRoute(''), icon: ShieldCheck },
 ];
 
 // --- Footer Component ---
@@ -222,20 +222,23 @@ const Footer = () => {
         {/* Bottom Section: Copyright & Socials */}
         <div className="flex flex-col md:flex-row md:justify-between items-center pt-8">
           <p className="text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} ShopName. All rights reserved.
+            &copy; {new Date().getFullYear()} Hivictus. All rights reserved.
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+            <a href="https://www.facebook.com/hivictuspvtltd/" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
               <Facebook className="w-5 h-5" />
             </a>
-            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+            <a href="https://x.com/Hivictuspvtltd" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
               <Twitter className="w-5 h-5" />
             </a>
-            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+            <a href="https://www.instagram.com/hivictuspvtltd/" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
               <Instagram className="w-5 h-5" />
             </a>
-            <a href="#" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+            <a href="https://www.linkedin.com/company/hivictus/" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
               <Linkedin className="w-5 h-5" />
+            </a>
+             <a href="https://www.youtube.com/@hivictuspvtltd" className="text-gray-400 hover:text-emerald-500 transition-colors duration-200">
+              <Youtube className="w-5 h-5" />
             </a>
           </div>
         </div>

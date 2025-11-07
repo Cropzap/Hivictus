@@ -3,7 +3,7 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 // --- API Configuration ---
 // This URL should point to your backend API endpoint for banners.
-const API_URL = 'http://localhost:5000/api/banners';
+const API_URL = 'https://api.hivictus.com/api/banners';
 
 // --- Main Component ---
 const BannerApp = () => {

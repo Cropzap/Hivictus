@@ -182,7 +182,7 @@ const FullWidthCategoryExplorer = () => {
     } catch (err) {
       console.error("Error fetching categories:", err);
       // Set a user-friendly error message
-      setError(`Connection Error: Could not connect to the backend (http://localhost:5000/api/categories).`);
+      setError(`Connection Error: Could not connect to the backend (https://api.hivictus.com/api/categories).`);
       setCategories([]);
     } finally {
       setLoading(false);

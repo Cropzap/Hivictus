@@ -18,7 +18,7 @@ export const CartProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/cart', {
+      const response = await fetch('https://api.hivictus.com/api/cart', {
         headers: {
           'x-auth-token': currentToken,
           'Content-Type': 'application/json',

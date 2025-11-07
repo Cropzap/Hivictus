@@ -7,8 +7,8 @@ import {
   X,
   ShoppingCart,
   User,
-  MapPin, 
-  Search, 
+  MapPin,
+  Search,
   Tag,
   Info,
   Package,
@@ -19,6 +19,8 @@ import {
   Home,
   HelpCircle,
   FileText,
+  CheckCircle, // For success message
+  AlertTriangle, // For warning message
 } from "lucide-react";
 import { useCart } from '../context/CartContext';
 
@@ -33,22 +35,198 @@ const CartContext = createContext();
 // Utility function to convert names to URL-safe slugs
 const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
+// Utility function to simulate a pincode validation API call
+// Tamil Nadu Pincodes typically start with 6. We'll simulate a range from 600000 to 649999
+const checkServiceAvailability = async (pincode) => {
+  // Simple check for a valid 6-digit number format
+  if (!/^\d{6}$/.test(pincode)) {
+    return {
+      available: false,
+      message: "Please enter a valid 6-digit Pincode.",
+    };
+  }
+
+  // Simulate API call delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const code = parseInt(pincode, 10);
+  const isTamilNadu = code >= 600000 && code <= 649999;
+
+  if (isTamilNadu) {
+    return {
+      available: true,
+      message: "🎉 **Hivictus service available in your area!** You can login and purchase the products.",
+    };
+  } else {
+    return {
+      available: false,
+      message: "😔 **Our service will come soon** to your area. Thank you for your interest!",
+    };
+  }
+};
+
+
+// --- Location Popup Component (NEW) ---
+
+const LocationPopup = ({ isOpen, onClose, isLoggedIn }) => {
+  const [pincode, setPincode] = useState("");
+  const [status, setStatus] = useState(null); // { available: boolean, message: string }
+  const [loading, setLoading] = useState(false);
+  const popupRef = useRef(null);
+  const isMobile = window.innerWidth < 768;
+
+  // Animation variants for Framer Motion
+  const popupVariants = {
+    // Desktop: Right Top Corner slide-in
+    desktop: {
+      initial: { opacity: 0, x: 20, y: -20 },
+      animate: { opacity: 1, x: 0, y: 0 },
+      exit: { opacity: 0, x: 20, y: -20 },
+    },
+    // Mobile: Center fade-in/scale
+    mobile: {
+      initial: { opacity: 0, scale: 0.9 },
+      animate: { opacity: 1, scale: 1 },
+      exit: { opacity: 0, scale: 0.9 },
+    },
+  };
+
+  const handlePincodeCheck = async (e) => {
+    e.preventDefault();
+    if (pincode.length !== 6) {
+      setStatus({ available: false, message: "Pincode must be 6 digits." });
+      return;
+    }
+    setLoading(true);
+    setStatus(null);
+
+    const result = await checkServiceAvailability(pincode);
+    setStatus(result);
+    setLoading(false);
+  };
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (popupRef.current && !popupRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      // Reset state when closing
+      setPincode("");
+      setStatus(null);
+      setLoading(false);
+    }
+
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, onClose]);
+
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={`fixed inset-0 ${isMobile ? 'flex items-center justify-center bg-black bg-opacity-50' : ''} z-[90]`}>
+      <motion.div
+        ref={popupRef}
+        variants={isMobile ? popupVariants.mobile : popupVariants.desktop}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={{ type: "spring", stiffness: isMobile ? 300 : 150, damping: 30 }}
+        className={`bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-sm z-50 transform ${!isMobile ? 'absolute top-24 right-4' : ''}`}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="Close"
+        >
+          <X size={20} />
+        </button>
+
+        <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center">
+          <MapPin size={24} className="mr-2" /> Check Service Area
+        </h3>
+
+        <form onSubmit={handlePincodeCheck} className="space-y-4">
+          <label htmlFor="pincode" className="block text-sm font-medium text-gray-700">
+            Enter your 6-digit Pincode
+          </label>
+          <input
+            id="pincode"
+            type="number"
+            value={pincode}
+            onChange={(e) => {
+              const value = e.target.value.slice(0, 6); // Limit to 6 characters
+              setPincode(value);
+              setStatus(null); // Clear status on input change
+            }}
+            placeholder="e.g., 600001"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-lg"
+            maxLength={6}
+            min="100000"
+            max="999999"
+          />
+          <button
+            type="submit"
+            disabled={loading || pincode.length !== 6}
+            className={`w-full py-2 px-4 rounded-lg text-white font-semibold transition-colors ${loading || pincode.length !== 6 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-700 hover:bg-green-800'}`}
+          >
+            {loading ? 'Checking...' : 'Check Availability'}
+          </button>
+        </form>
+
+        <AnimatePresence>
+          {status && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className={`mt-4 p-4 rounded-lg text-sm font-medium ${status.available ? 'bg-green-50 border border-green-300 text-green-800' : 'bg-red-50 border border-red-300 text-red-800'}`}
+            >
+              <div className="flex items-start">
+                {status.available ? <CheckCircle size={20} className="mr-2 flex-shrink-0 mt-0.5" /> : <AlertTriangle size={20} className="mr-2 flex-shrink-0 mt-0.5" />}
+                <div>
+                    <p dangerouslySetInnerHTML={{ __html: status.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                    {status.available && !isLoggedIn && (
+                        <Link 
+                            to="/login" 
+                            onClick={onClose}
+                            className="mt-2 inline-flex items-center text-green-700 hover:text-green-900 font-bold transition-colors"
+                        >
+                            <LogIn size={16} className="mr-1" /> Login to Purchase
+                        </Link>
+                    )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+};
 
 // --- Utility Components (Mobile Nav Items) ---
 
 // Mobile Navigation Item Component (for Menu Drawer)
-const MobileNavItem = ({ to, onClick, icon, label, badgeCount = 0, subcategories = [] }) => {
+const MobileNavItem = ({ to, onClick, icon, label, badgeCount = 0, subcategories = [], isLogout = false }) => {
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
   // Check if the current path (excluding query params) matches the link's path
-  const isActive = to && location.pathname === to.split('?')[0]; 
+  const isActive = to && location.pathname === to.split('?')[0];
 
   const itemClass = `flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-300
-    ${isActive ? "bg-green-600 text-white shadow-md" : "text-gray-700 hover:bg-gray-100"}`;
+    ${isActive ? "bg-green-600 text-white shadow-md" : "text-gray-700 hover:bg-gray-100"}
+    ${isLogout ? "text-red-600 hover:bg-red-50 hover:text-red-700" : ""}`; // 👈 Styling for Logout
 
   if (subcategories.length > 0) {
     // When subcategories exist, the main link (to) is the category link
-    const categorySlug = slugify(label); 
+    const categorySlug = slugify(label);
 
     return (
       <div className="w-full">
@@ -119,7 +297,7 @@ const MobileFloatingNavItem = ({ to, icon, label, badgeCount = 0 }) => {
   const isActive = location.pathname === to;
 
   // Use the new primary color for active state: a friendly, earthy green
-  const activeColor = "text-green-700"; 
+  const activeColor = "text-green-700";
   const inactiveColor = "text-gray-500 hover:text-green-700";
 
   return (
@@ -146,20 +324,23 @@ const MobileFloatingNavItem = ({ to, icon, label, badgeCount = 0 }) => {
 
 
 // --- Main Navbar Component ---
-const Navbar = ({ isLoggedIn, handleLogout }) => {
+const Navbar = ({ isLoggedIn, handleLogout }) => { // 👈 Prop received
   const [isClient, setIsClient] = useState(false);
   const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [hoveredCategory, setHoveredCategory] = useState(null); 
+  const [hoveredCategory, setHoveredCategory] = useState(null);
   const [categories, setCategories] = useState([]); // State for categories
   const location = useLocation();
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  // --- Location Popup State (NEW) ---
+  const [isLocationPopupOpen, setIsLocationPopupOpen] = useState(false);
+
 
   // --- Search State ---
   const [searchInput, setSearchInput] = useState("");
   // Tracks selected category in the dropdown (only used for desktop search)
-  const [searchCategory, setSearchCategory] = useState("all"); 
+  const [searchCategory, setSearchCategory] = useState("all");
   const [searchResults, setSearchResults] = useState([]);
   const searchDropdownRef = useRef(null); // Ref for the search area (used for both desktop and mobile to close suggestions)
   // --- End Search State ---
@@ -167,7 +348,6 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
 
   // Consume cart context (using the mock above)
   // cartItemCount is now a dynamic state value from the useCart mock
-  
   const { cartItemCount, fetchCartQuantity } = useCart();
 
   const accountDropdownRef = useRef(null); // Kept for consistency if future logic is added
@@ -200,7 +380,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
         { _id: 'v1', name: "Vegetables", subcategories: [{ name: "Leafy Greens", imageUrl: '150x150/dcfce7/065f46?text=LG' }, { name: "Root Vegetables", imageUrl: '150x150/fecaca/991b1b?text=RV' }] },
         { _id: 'f1', name: "Fruits", subcategories: [{ name: "Seasonal Fruits", imageUrl: '150x150/ffe4e6/881337?text=SF' }, { name: "Exotic Fruits", imageUrl: '150x150/fae8ff/581c87?text=EF' }, { name: "Citrus Fruits", imageUrl: '150x150/fff7e6/b45309?text=CF' }] }, // Updated one subcat to have a space
         { _id: 'd1', name: "Dairy", subcategories: [{ name: "Milk & Eggs", imageUrl: '150x150/e0f2fe/075985?text=ME' }, { name: "Cheese & Butter", imageUrl: '150x150/fefce8/713f12?text=CB' }] },
-        { _id: 'g1', name: "Grains", subcategories: [] } 
+        { _id: 'g1', name: "Grains", subcategories: [] }
       ]);
     }
   }, []);
@@ -208,9 +388,9 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
   useEffect(() => {
     fetchCategories();
     // 🚀 IMPORTANT: Call the mock fetchCartQuantity here to simulate initial load.
-    fetchCartQuantity(); 
-  }, [fetchCategories, fetchCartQuantity, isLoggedIn]); 
-  
+    fetchCartQuantity();
+  }, [fetchCategories, fetchCartQuantity, isLoggedIn]);
+
   // --- Search Logic: Filter Subcategories ---
   const filterSubcategories = useCallback((term, categorySlug) => {
     // Only show suggestions if the term is at least 2 characters long
@@ -221,9 +401,9 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
     if (categorySlug !== 'all') {
         filteredCategories = categories.filter(cat => slugify(cat.name) === categorySlug);
     }
-    
+
     const results = [];
-    
+
     filteredCategories.forEach(cat => {
         cat.subcategories.forEach(sub => {
             if (sub.name.toLowerCase().includes(term.toLowerCase())) {
@@ -235,7 +415,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
             }
         });
     });
-    
+
     return results.slice(0, 5); // Limit to top 5 results
   }, [categories]);
 
@@ -245,12 +425,12 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
       const currentCategory = window.innerWidth < 768 ? 'all' : searchCategory;
       setSearchResults(filterSubcategories(searchInput, currentCategory));
   }, [searchInput, searchCategory, filterSubcategories]);
-  
+
   // Handlers for search components
   const handleInputChange = (e) => {
       setSearchInput(e.target.value);
   };
-  
+
   const handleCategorySelect = (e) => {
       setSearchCategory(e.target.value);
   };
@@ -260,7 +440,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
     const handleClickOutside = (event) => {
       if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target)) {
         // Keeping this logic for potential future use of the account dropdown
-        // setIsAccountDropdownOpen(false); 
+        // setIsAccountDropdownOpen(false);
       }
       if (shopDropdownRef.current && !shopDropdownRef.current.contains(event.target)) {
         setIsShopDropdownOpen(false);
@@ -274,7 +454,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
       ) {
         setIsMobileMenuOpen(false);
       }
-      
+
       // Close search results if clicking outside the search area AND the input/button itself
       if (searchDropdownRef.current && !searchDropdownRef.current.contains(event.target)) {
           setSearchResults([]);
@@ -325,7 +505,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => {
 
   // Custom Logo component for visual parity with the image
 const MyHarvestLogo = () => (
-  
+
   <div className="flex items-center justify-center">
     <Link to="/">
     <img
@@ -384,7 +564,7 @@ const MyHarvestLogo = () => (
                 />
 
                 {/* Search Button (navigates to products with search query) */}
-                <Link 
+                <Link
                     // Search Link uses general search query parameter 'q' and selected category
                     to={`/products?q=${searchInput}&category=${searchCategory}`}
                     onClick={() => {
@@ -420,7 +600,7 @@ const MyHarvestLogo = () => (
                         className="flex items-center p-3 hover:bg-green-50 transition-colors border-b border-gray-100 last:border-b-0"
                       >
                         {/* Mock Image for Subcategory */}
-                        <img 
+                        <img
                             src={`https://placehold.co/${result.imageUrl}`} // 🚀 CORRECTED: Added proper base URL for placeholder
                             alt={result.subcategoryName}
                             className="w-8 h-8 rounded-md object-cover mr-3 flex-shrink-0"
@@ -440,16 +620,34 @@ const MyHarvestLogo = () => (
 
             {/* Right Action Icons (Sign In/Register, Location, Cart) */}
             <div className="flex items-center space-x-6 text-gray-700">
-              {/* Sign In / Register */}
-              <Link to={isLoggedIn ? "/profile" : "/login"} className="flex items-center space-x-1 hover:text-green-700 transition-colors">
+              {/* 👈 UPDATED: Sign In / My Profile */}
+              <Link
+                to={isLoggedIn ? "/profile" : "/login"}
+                className="flex items-center space-x-1 hover:text-green-700 transition-colors"
+              >
                 <User size={20} />
                 <span className="text-sm font-medium whitespace-nowrap">
                   {isLoggedIn ? "My Profile" : "Sign in / Register"}
                 </span>
               </Link>
+              {/* 👈 NEW: Logout Button for Logged In User */}
+              {isLoggedIn && (
+                  <button
+                      onClick={handleLogout}
+                      className="flex items-center space-x-1 text-red-600 hover:text-red-700 transition-colors"
+                      title="Logout"
+                  >
+                      <LogOut size={20} />
+                  </button>
+              )}
 
-              {/* Location/Address */}
-              <button className="hover:text-green-700 transition-colors">
+
+              {/* Location/Address (DESKTOP) - Triggers Popup (UPDATED) */}
+              <button
+                onClick={() => setIsLocationPopupOpen(true)}
+                className="hover:text-green-700 transition-colors"
+                title="Check Service Availability"
+              >
                 <MapPin size={20} />
               </button>
 
@@ -497,7 +695,7 @@ const MyHarvestLogo = () => (
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute top-full mt-2 left-0 w-64 bg-white shadow-2xl rounded-lg py-2 border border-gray-100 z-50 overflow-visible" 
+                    className="absolute top-full mt-2 left-0 w-64 bg-white shadow-2xl rounded-lg py-2 border border-gray-100 z-50 overflow-visible"
                     onMouseEnter={() => setIsShopDropdownOpen(true)}
                     onMouseLeave={() => {
                         setIsShopDropdownOpen(false);
@@ -505,9 +703,9 @@ const MyHarvestLogo = () => (
                     }}
                   >
                     {categories.map((cat) => (
-                      <div 
-                        key={cat._id} 
-                        className="relative group/category" 
+                      <div
+                        key={cat._id}
+                        className="relative group/category"
                         onMouseEnter={() => setHoveredCategory(cat._id)}
                         onMouseLeave={() => setHoveredCategory(null)}
                       >
@@ -560,7 +758,7 @@ const MyHarvestLogo = () => (
               <Link to="/products" className={navLinkClass("/products")}>
                 Products
               </Link>
-              <Link to="https://www.hivictus.com/our-story" className={navLinkClass("/about")}>
+              <Link to="https://www.hivictus.com/our-story" className={navLinkClass("https://www.hivictus.com/our-story")}>
                 About Us
               </Link>
             </nav>
@@ -581,6 +779,14 @@ const MyHarvestLogo = () => (
         </Link>
 
         <div className="flex items-center space-x-3">
+            {/* Location/Address (MOBILE) - Triggers Popup (UPDATED) */}
+            <button
+                onClick={() => setIsLocationPopupOpen(true)}
+                className="hover:text-green-700 transition-colors"
+                title="Check Service Availability"
+            >
+                <MapPin size={24} />
+            </button>
           {/* Cart Icon */}
           <Link to="/cart" className="relative text-gray-700 hover:text-green-700 transition-colors duration-200">
             <ShoppingCart size={24} />
@@ -618,9 +824,9 @@ const MyHarvestLogo = () => (
             value={searchInput}
             onChange={handleInputChange}
             // Mobile search defaults to checking all categories for suggestions
-            onFocus={() => { if(searchInput.length >= 2) setSearchResults(filterSubcategories(searchInput, 'all')); }} 
+            onFocus={() => { if(searchInput.length >= 2) setSearchResults(filterSubcategories(searchInput, 'all')); }}
           />
-          <Link 
+          <Link
               // Mobile Search Link uses general search query parameter 'q'
               to={`/products?q=${searchInput}`}
               onClick={() => {
@@ -634,32 +840,29 @@ const MyHarvestLogo = () => (
           </Link>
         </div>
 
-        {/* Search Suggestions Dropdown (Mobile) */}
+        {/* Mobile Search Suggestions Dropdown */}
         <AnimatePresence>
             {searchInput.length >= 2 && searchResults.length > 0 && (
                 <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.15 }}
-                    // Positioned absolutely below the input bar within this container
-                    className="absolute w-[calc(100%-1.5rem)] mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto"
+                    className="absolute w-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto"
                 >
                     {searchResults.map((result, index) => (
                         <Link
                             key={index}
-                            // 🚀 Suggestion Link passes both category and subcategory (using slugify)
                             to={`/products?category=${slugify(result.categoryName)}&subcategory=${slugify(result.subcategoryName)}`}
                             onClick={() => {
                                 setSearchInput("");
                                 setSearchResults([]);
+                                setIsMobileMenuOpen(false); // Close menu if it was open
                             }}
                             className="flex items-center p-3 hover:bg-green-50 transition-colors border-b border-gray-100 last:border-b-0"
                         >
-                            {/* Mock Image for Subcategory */}
-                            <img 
-                                // 🚀 CORRECTED: Added proper base URL for placeholder
-                                src={`https://placehold.co/${result.imageUrl}`} 
+                            <img
+                                src={`https://placehold.co/${result.imageUrl}`}
                                 alt={result.subcategoryName}
                                 className="w-8 h-8 rounded-md object-cover mr-3 flex-shrink-0"
                                 onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.style.paddingLeft = '3.5rem';}}
@@ -675,84 +878,168 @@ const MyHarvestLogo = () => (
         </AnimatePresence>
       </motion.div>
 
-      {/* 🔹 Mobile Full-Screen Menu (when toggled) */}
+
+      {/* 🔹 Mobile Menu Drawer (Full-Screen) */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, x: "100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: "100%" }}
-            transition={{ type: "spring", stiffness: 150, damping: 20 }}
-            className="md:hidden fixed top-0 right-0 h-full w-full bg-white z-40 p-6 overflow-y-auto shadow-lg"
             ref={mobileNavRef}
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "tween", duration: 0.3 }}
+            className="fixed inset-0 top-[112px] bg-white z-40 overflow-y-auto p-4 md:hidden shadow-xl" // 112px is 48px (top bar) + 40px (search bar) + 24px (p-3 * 2) - approximation
           >
-            <div className="flex flex-col items-start space-y-4 pb-10 pt-40">
-              <h3 className="text-lg font-semibold text-gray-800">Categories</h3>
-              {/* Populate Mobile Menu with Categories and Subcategories */}
-              {categories.map((cat) => (
-                <MobileNavItem
-                  key={cat._id}
-                  icon={<Package size={20} />}
-                  label={cat.name}
-                  subcategories={cat.subcategories}
-                  // 🚀 Mobile Main Category Link: Uses slugify for the category
-                  to={`/products?category=${slugify(cat.name)}`} 
-                  onClick={() => setIsMobileMenuOpen(false)} // Pass close function to nested links
-                />
-              ))}
+            <div className="space-y-4">
 
-              <div className="w-full h-px bg-gray-200 my-4" />
+              {/* 👈 UPDATED: User/Auth Links Section */}
+              <div className="border-b pb-4 space-y-2">
+                {isLoggedIn ? (
+                  <>
+                    <MobileNavItem
+                      to="/profile"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<User size={20} />}
+                      label="My Profile"
+                    />
+                    <MobileNavItem
+                      // Logout is a button, not a link, and calls the prop function
+                      onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
+                      icon={<LogOut size={20} />}
+                      label="Logout"
+                      isLogout={true}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <MobileNavItem
+                      to="/login"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<LogIn size={20} />}
+                      label="Sign In"
+                    />
+                    <MobileNavItem
+                      to="/register"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<UserPlus size={20} />}
+                      label="Register"
+                    />
+                  </>
+                )}
+              </div>
+              {/* General Navigation Links */}
+              <div className="space-y-2 border-b pb-4">
+                  <MobileNavItem
+                      to="/"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<Home size={20} />}
+                      label="Home"
+                  />
+                  <MobileNavItem
+                      to="/products"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<ListOrdered size={20} />}
+                      label="Products"
+                  />
+              </div>
 
-              <h3 className="text-lg font-semibold text-gray-800">Quick Links</h3>
-              {/* PRODUCTS LINK */}
-              <MobileNavItem to="/products" onClick={() => setIsMobileMenuOpen(false)} icon={<Tag size={20} />} label="Products" />
-              <MobileNavItem to="/about" onClick={() => setIsMobileMenuOpen(false)} icon={<Info size={20} />} label="About Us" />
+              {/* Shop by Categories Section */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-gray-800 px-3 pt-2">Shop By Categories</h3>
+                {categories.map((cat) => (
+                  <MobileNavItem
+                    key={cat._id}
+                    // The main link is the category itself
+                    to={cat.subcategories.length > 0 ? null : `/products?category=${slugify(cat.name)}`}
+                    onClick={cat.subcategories.length > 0 ? undefined : () => setIsMobileMenuOpen(false)}
+                    icon={<Package size={20} />}
+                    label={cat.name}
+                    subcategories={cat.subcategories}
+                  />
+                ))}
+              </div>
 
-              <div className="w-full h-px bg-gray-200 my-4" />
+              {/* Additional Links */}
+              <div className="space-y-2 pt-4 border-t mt-4">
+                  <MobileNavItem
+                      to="https://www.hivictus.com/our-story"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<Info size={20} />}
+                      label="About Us"
+                  />
+                  <MobileNavItem
+                      to="/faq"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<HelpCircle size={20} />}
+                      label="FAQ"
+                  />
+                  <MobileNavItem
+                      to="/terms"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      icon={<FileText size={20} />}
+                      label="Terms & Conditions"
+                  />
+              </div>
 
-              <h3 className="text-lg font-semibold text-gray-800">Account</h3>
-              <MobileNavItem to="/" onClick={() => setIsMobileMenuOpen(false)} icon={<Home size={20} />} label="Home" />
-              <MobileNavItem to="/orders" onClick={() => setIsMobileMenuOpen(false)} icon={<ListOrdered size={20} />} label="My Orders" />
-              {isLoggedIn ? (
-                <>
-                  <MobileNavItem to="/profile" onClick={() => setIsMobileMenuOpen(false)} icon={<User size={20} />} label="My Profile" />
-                  <MobileNavItem onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} icon={<LogOut size={20} />} label="Sign Out" />
-                </>
-              ) : (
-                <>
-                  <MobileNavItem to="/login" onClick={() => setIsMobileMenuOpen(false)} icon={<LogIn size={20} />} label="Sign In" />
-                  <MobileNavItem to="/register" onClick={() => setIsMobileMenuOpen(false)} icon={<UserPlus size={20} />} label="Register" />
-                </>
-              )}
-              
-              <div className="w-full h-px bg-gray-200 my-4" />
-
-              <h3 className="text-lg font-semibold text-gray-800">Support</h3>
-              <MobileNavItem to="/faq" onClick={() => setIsMobileMenuOpen(false)} icon={<HelpCircle size={20} />} label="FAQ" />
-              <MobileNavItem to="/terms" onClick={() => setIsMobileMenuOpen(false)} icon={<FileText size={20} />} label="Terms & Conditions" />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 🔹 Mobile Floating Bottom Navigation */}
-      <motion.div
-        initial={{ y: 100 }}
-        animate={{ y: isMobileNavVisible ? 0 : 100 }}
-        transition={{ type: "tween", duration: 0.3 }}
-        className="md:hidden fixed bottom-0 left-0 w-full bg-white shadow-2xl border-t border-gray-200 p-2 z-50 flex justify-around"
-      >
-        <MobileFloatingNavItem to="/" icon={<Home size={24} />} label="Home" />
-        <MobileFloatingNavItem to="/products" icon={<Tag size={24} />} label="Shop" />
-        <MobileFloatingNavItem to="/cart" icon={<ShoppingCart size={24} />} label="Cart" badgeCount={cartItemCount} />
-        <MobileFloatingNavItem to="/profile" icon={<User size={24} />} label="Account" />
-      </motion.div>
-      
-      {/* Spacer for content underneath the fixed navbar */}
-      <div className="block md:hidden h-[9.5rem]" /> {/* Spacer for top bar (h-16) and search bar (h-10 + padding) */}
-      <div className="hidden md:block h-36" /> {/* Spacer for two desktop rows */}
+      {/* 🔹 Mobile Floating Bottom Navigation Bar */}
+      <AnimatePresence>
+        {isMobileNavVisible && (
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "tween", duration: 0.3 }}
+            className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg p-2 flex justify-around items-center z-50"
+          >
+            <MobileFloatingNavItem to="/" icon={<Home size={24} />} label="Home" />
+            <MobileFloatingNavItem to="/products" icon={<Tag size={24} />} label="Shop" />
+            <MobileFloatingNavItem to="/cart" icon={<ShoppingCart size={24} />} label="Cart" badgeCount={cartItemCount} />
+            <MobileFloatingNavItem to={isLoggedIn ? "/profile" : "/login"} icon={<User size={24} />} label={isLoggedIn ? "Profile" : "Sign In"} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🚀 Location Popup Component Instance (NEW) */}
+      <AnimatePresence>
+          {isLocationPopupOpen && (
+              <LocationPopup
+                  isOpen={isLocationPopupOpen}
+                  onClose={() => setIsLocationPopupOpen(false)}
+                  isLoggedIn={isLoggedIn}
+              />
+          )}
+      </AnimatePresence>
+
+      {/* 🔹 Padding for Fixed Navbars */}
+      <div className="hidden md:block h-36"></div> {/* Height of desktop fixed nav (80 + 64 + border) */}
+      <div className="md:hidden h-[120px]"></div> {/* Height of mobile fixed nav (48 + 40 + p-3*2) */}
     </div>
   );
 };
 
+// --- Mocking useCart and providing a placeholder CartContext for the environment ---
+const mockUseCart = () => {
+    const [cartItemCount, setCartItemCount] = useState(3);
+    const fetchCartQuantity = () => {
+        // Simulate fetching the initial quantity
+        // In a real app, this would be an async API call
+        console.log("Fetching cart quantity...");
+    };
+    return { cartItemCount, fetchCartQuantity, /* other cart functions */ };
+};
+
+const CartProvider = ({ children }) => {
+    const cart = mockUseCart();
+    return <CartContext.Provider value={cart}>{children}</CartContext.Provider>;
+};
+
+// Export the mock useCart for the Navbar component to consume (as in the original structure)
+
+
+// Export the main component
 export default Navbar;
