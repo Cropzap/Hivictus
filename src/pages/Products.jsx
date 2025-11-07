@@ -122,41 +122,56 @@ const ProductCard = ({ product }) => {
     }
   }, []);
 
-  const handleAddToCart = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+const handleAddToCart = async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
 
-    if (!authToken) {
-      toast.error('Please log in to add items to cart.');
-      return;
-    }
+  if (!authToken) {
+    toast.error("Please log in to add items to cart.");
+    return;
+  }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/cart/add`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Note: Assuming your auth middleware accepts 'x-auth-token' or 'Authorization: Bearer'
-          'x-auth-token': authToken, 
-        },
-        body: JSON.stringify({ productId: product._id, quantity: 1 }),
-      });
+  try {
+    const response = await fetch(`${API_BASE_URL}/cart/add`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-auth-token": authToken,
+      },
+      body: JSON.stringify({
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+       imageUrl: product.product?.imageUrls?.[0], // ✅ FIXED
+        quantity: 1,
+      }),
+    });
 
-      if (!response.ok) {
-        // Attempt to read error message from response body
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      let errorMessage = "";
+
+      if (contentType && contentType.includes("application/json")) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to add item to cart.');
+        errorMessage = errorData.message || errorData.msg || "Unknown server error";
+      } else {
+        const errorText = await response.text(); // ✅ read once
+        errorMessage = errorText || `Server error - ${response.status}`;
       }
 
-      toast.success(`${product.name} added to cart!`);
-      // Note: In a full app, you'd also want to trigger a cart context refresh here
-      // For simplicity, this is omitted if the context isn't fully set up.
-
-    } catch (err) {
-      console.error('Error adding to cart from ProductCard:', err);
-      toast.error(`Failed to add to cart: ${err.message || 'Server error'}`);
+      throw new Error(errorMessage);
     }
-  };
+
+    toast.success(`${product.name} added to cart!`);
+
+  } catch (err) {
+    console.error("Error adding to cart from ProductCard:", err);
+    toast.error(err.message || "Failed to add to cart");
+  }
+};
+
+
+
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },

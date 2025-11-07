@@ -40,7 +40,7 @@ const UserCircleIcon = (props) => (
 // --- PriceUnit Component ---
 const PriceUnit = ({ price, unit }) => (
   <p className="font-bold text-gray-900 text-lg">
-    ${price?.toFixed(2) || 'N/A'}{unit && <span className="text-sm font-normal text-gray-500"> / {unit}</span>}
+    ₹{price?.toFixed(2) || 'N/A'}{unit && <span className="text-sm font-normal text-gray-500"> / {unit}</span>}
   </p>
 );
 
