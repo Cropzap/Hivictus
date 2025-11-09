@@ -21,6 +21,8 @@ import ProductDescription from './pages/ProductDescription';
 
 import { CartProvider } from './context/CartContext.jsx';
 import './App.css';
+import ReturnRefundPolicy from './components/ReturnRefundPolicy.jsx';
+import ShippingPolicy from './components/ShippingPolicy.jsx';
 
 
 // 🔹 Scroll to top when route changes
@@ -95,6 +97,8 @@ const AppContent = () => {
           <Route path="/support" element={<SupportTicket user={user} />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/refund-policy" element={<ReturnRefundPolicy />} />
+          <Route path="/shipping-policy" element={<ShippingPolicy />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/about" element={<AboutUs />} />

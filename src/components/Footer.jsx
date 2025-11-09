@@ -26,6 +26,8 @@ const mapLinkToRoute = (text) => {
   // Custom static routes
   if (slug.includes('privacy-policy')) return '/privacy-policy';
   if (slug.includes('terms-and-conditions')) return '/terms-and-conditions';
+   if (slug.includes('refund-policy')) return '/refund-policy';
+    if (slug.includes('shipping-policy')) return '/shipping-policy';
   if (slug.includes('faq')) return '/faq';
   if (slug.includes('about-us')) return 'https://www.hivictus.com/our-story';
   if (slug.includes('contact-us') || slug.includes('support')) return '/support'; 
@@ -43,7 +45,9 @@ const CompanyLinks = [
 
 const CustomerServiceLinks = [
   { text: 'Privacy Policy', link: mapLinkToRoute('Privacy Policy') }, 
-  { text: 'Terms & Conditions', link: mapLinkToRoute('Terms and Conditions') }, 
+  { text: 'Terms & Conditions', link: mapLinkToRoute('Terms and Conditions') },
+  { text: 'Refund Policy', link: mapLinkToRoute('Refund Policy') }, 
+  { text: 'Shipping Policy', link: mapLinkToRoute('Shipping Policy') }, 
   { text: 'FAQs', link: mapLinkToRoute('FAQ') }, 
   { text: 'Support', link: mapLinkToRoute('Support') }, 
 ];
