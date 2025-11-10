@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Minus, Plus, ChevronLeft, Trash2, Check, X, Loader, MapPin, Phone, User, PlusCircle, Smile, Truck } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, ChevronLeft, Trash2, Check, X, Loader, MapPin, Phone, User, PlusCircle, Smile, Truck, DollarSign } from 'lucide-react';
 import { useCart } from '../context/CartContext'; // Assuming this context exists
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -10,28 +10,25 @@ const FALLBACK_IMAGE_URL = 'https://placehold.co/100x100/E5E7EB/9CA3AF?text=Prod
 // --- CONSTANTS ---
 const PLATFORM_FEE = 2.00;
 const SMILE_FUND_DONATION = 1.00;
-const DELIVERY_DISCOUNT_RATE = 0.35;
-// TAX IS REMOVED as per request.
+const DELIVERY_DISCOUNT_PERCENTAGE = 0.05; // 5% Discount Rate applied to Subtotal
 const TAX_RATE = 0.00; 
 
-// --- PROFILE ADDRESS MODEL MAPPING ---
-/*
-  Profile Model: { address: { street, apartment, landmark, city, state, zip, country }, name, mobile }
-  Shipping Details Model: { name, address1, address2, city, postalCode, country, phone }
-*/
+// ====================================================================
+// --- PROFILE ADDRESS MODEL MAPPING (Unchanged) ---
+// ====================================================================
+
 const mapProfileToShipping = (profile, profileAddress) => ({
     name: profile?.name || '',
-    // Apply profile model fields to address lines 1 and 2
-    address1: profileAddress?.street || '', // street goes to Address Line 1
-    address2: profileAddress?.apartment ? `${profileAddress.apartment}, ${profileAddress.landmark || ''}`.trim() : profileAddress?.landmark || '', // apartment/landmark goes to Address Line 2
+    address1: profileAddress?.street || '', 
+    address2: profileAddress?.apartment ? `${profileAddress.apartment}, ${profileAddress.landmark || ''}`.trim() : profileAddress?.landmark || '',
     city: profileAddress?.city || '',
-    postalCode: profileAddress?.zip || '', // zip goes to Postal Code
+    postalCode: profileAddress?.zip || '', 
     country: profileAddress?.country || 'India',
     phone: profile?.mobile || '',
 });
 
 // ====================================================================
-// --- UPDATED: Order Success Screen Component ---
+// --- Order Success Screen Component (Unchanged) ---
 // ====================================================================
 
 const OrderSuccessScreen = ({ totalAmount, orderDetails }) => {
@@ -41,14 +38,13 @@ const OrderSuccessScreen = ({ totalAmount, orderDetails }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             setIsVisible(false);
-        }, 5000); // Show for 5 seconds
+        }, 5000); 
 
         return () => clearTimeout(timer);
     }, []);
 
     if (!isVisible) return null;
 
-    // Filter out tax entries for display
     const filteredOrderDetails = Object.entries(orderDetails)
         .filter(([key]) => !key.toLowerCase().includes('tax'));
     
@@ -68,7 +64,6 @@ const OrderSuccessScreen = ({ totalAmount, orderDetails }) => {
                 <Check size={80} className="text-green-600 mx-auto mb-6 p-2 bg-green-100 rounded-full" />
                 <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Order Placed Successfully!</h2>
                 
-                {/* 🔑 New Content Insertion 🔑 */}
                 <p className="text-gray-700 mb-4 font-semibold">
                     Thank you so much for your order with Hivictus.
                 </p>
@@ -104,7 +99,7 @@ const OrderSuccessScreen = ({ totalAmount, orderDetails }) => {
 
 
 // ====================================================================
-// --- New Address Modal Component (Replaces old CheckoutModal) ---
+// --- New Address Modal Component (Unchanged Flow) ---
 // ====================================================================
 
 const InputField = ({ label, name, type = 'text', value, onChange, required = false }) => (
@@ -125,7 +120,7 @@ const InputField = ({ label, name, type = 'text', value, onChange, required = fa
 const AddNewAddressModal = ({ isOpen, onClose, onPlaceOrder, shippingDetails, onShippingChange, total, orderSummary, isPlacingOrder }) => {
     
     const filteredOrderSummary = Object.entries(orderSummary)
-        .filter(([key]) => !key.toLowerCase().includes('tax'));
+        .filter(([key]) => !key.toLowerCase().includes('delivery cost') && !key.toLowerCase().includes('charge'));
 
     return (
         <AnimatePresence>
@@ -173,9 +168,15 @@ const AddNewAddressModal = ({ isOpen, onClose, onPlaceOrder, shippingDetails, on
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="flex justify-between font-bold text-2xl text-green-700 pt-4 border-t mt-3">
-                                        <span>Total to Pay:</span>
-                                        <span>₹{total.toFixed(2)}</span>
+                                    <div className="flex flex-col pt-4 border-t mt-3">
+                                        <div className="flex justify-between font-bold text-2xl text-green-700">
+                                            <span>Total to Pay:</span>
+                                            <span>₹{total.toFixed(2)}</span>
+                                        </div>
+                                        {/* ADDED DELIVERY CHARGE MESSAGE */}
+                                        <p className="text-xs text-red-500 font-medium mt-1">
+                                            Delivery charges will be calculated and the payment QR code will be shared separately.
+                                        </p>
                                     </div>
                                 </div>
                                 <motion.button
@@ -367,17 +368,41 @@ const CartPage = () => {
             const data = await response.json();
             
             const processedCartItems = data.items
-                .filter(item => item.productId)
-                .map(item => ({
-                    productId: item.productId._id, 
-                    name: item.productId.name, 
-                    price: item.productId.price, 
-                    unit: item.productId.unit,
-                    productDetails: item.productId, 
-                    imageUrl: item.productId.imageUrl, 
-                    quantity: item.quantity, 
-                    isSelected: item.isSelected !== undefined ? item.isSelected : true
-                }));
+                .filter(item => {
+                    if (!item.productId) {
+                        console.error("Cart item skipped: productId is null or undefined.");
+                        return false;
+                    }
+                    return true;
+                })
+                .map(item => {
+                    const product = item.productId; 
+                    
+                    // DEFENSIVE PARSING: Convert to number and fallback to 0
+                    const deliveryCharge = parseFloat(product.deliveryCharges || 0) || 0;
+                    const netReceivable = parseFloat(product.netReceivable || 0) || 0;
+                    const platformEarnings = parseFloat(product.platformEarnings || 0) || 0;
+                    
+                    if (deliveryCharge === 0 && product.deliveryCharges !== 0 && product.deliveryCharges !== undefined && product.deliveryCharges !== null) {
+                        console.warn(`Delivery Charge for product ${product._id} parsed as 0. Raw data received:`, product.deliveryCharges);
+                    }
+
+                    return {
+                        productId: product._id, 
+                        name: product.name, 
+                        price: product.price, 
+                        unit: product.unit,
+                        
+                        deliveryChargeProduct: deliveryCharge, // Using the strictly parsed value
+                        netReceivableProduct: netReceivable, 
+                        platformEarningsProduct: platformEarnings, 
+                        
+                        productDetails: product, 
+                        imageUrl: product.imageUrls?.[0] || product.imageUrl, 
+                        quantity: item.quantity, 
+                        isSelected: item.isSelected !== undefined ? item.isSelected : true
+                    };
+                });
             setCartItems(processedCartItems);
         } catch (err) {
             setError(err.message);
@@ -408,58 +433,49 @@ const CartPage = () => {
         }
     }, [authToken, fetchCart, fetchCartQuantity, showToastMessage]);
 
-    // --- UPDATED Calculations: TAX REMOVED ---
-    const { 
-        subtotal, shipping, deliveryDiscount, deliveryCost, 
-        totalAmount, calculatedSummary, selectedItemCount, allSelected 
-    } = useMemo(() => {
-        const subtotal = cartItems.reduce((sum, item) => item.isSelected ? sum + item.price * item.quantity : sum, 0);
-        const selectedItemCount = cartItems.filter(i => i.isSelected).length;
-        const allSelected = cartItems.length > 0 && selectedItemCount === cartItems.length;
-        
-        // Base Charges
-        const baseShipping = selectedItemCount > 0 ? 50.00 : 0; // Price of delivery
-        const tax = subtotal * TAX_RATE; // TAX IS NOW 0.00
-        
-        // New Cost Calculation Logic
-        // Assume Platform Margin = 10% of Subtotal for calculation purposes
-        const platformMargin = subtotal * 0.10; 
+    // --- UPDATED Calculations: FINAL SIMPLIFIED LOGIC ---
+const { 
+    subtotal, 
+    deliveryDiscount, 
+    totalAmount, 
+    calculatedSummary, 
+    selectedItemCount, 
+    allSelected 
+} = useMemo(() => {
+    const selectedItems = cartItems.filter(item => item.isSelected);
 
-        // Delivery Discount = Total of Platform Margin * 0.35
-        const deliveryDiscount = platformMargin * DELIVERY_DISCOUNT_RATE;
+    const subtotal = selectedItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+    const selectedItemCount = selectedItems.length;
+    const allSelected = cartItems.length > 0 && selectedItemCount === cartItems.length;
 
-        // Delivery cost = Price of delivery - Delivery Discount
-        const deliveryCost = Math.max(0, baseShipping - deliveryDiscount);
+    const discountPercentage = DELIVERY_DISCOUNT_PERCENTAGE; // 0.05
+    const discountOnDelivery = subtotal * discountPercentage;
+    const roundedDiscountOnDelivery = parseFloat(discountOnDelivery.toFixed(2));
 
-        const platformFee = PLATFORM_FEE;
-        const smileFundDonation = SMILE_FUND_DONATION;
+    const platformFee = PLATFORM_FEE;
+    const smileFundDonation = SMILE_FUND_DONATION;
 
-        // Total Amount = Subtotal + Delivery Cost + Platform Fee + Smile Fund Donation (Tax excluded)
-        const totalAmount = subtotal + deliveryCost + platformFee + smileFundDonation;
+    const totalAmount = subtotal - roundedDiscountOnDelivery + platformFee + smileFundDonation;
+    const roundedTotalAmount = parseFloat(totalAmount.toFixed(2));
 
-        // The summary object for display
-        const calculatedSummary = {
-            'Subtotal': subtotal,
-            'Shipping (Base)': baseShipping,
-            'Platform Margin (10% of Subtotal)': platformMargin,
-            'Delivery Discount (35% of Margin)': deliveryDiscount,
-            'Delivery Cost (Final)': deliveryCost,
-            'Platform Fee': platformFee,
-            'Smile Fund Donation': smileFundDonation,
-            // 'Tax (0%)': tax, // Exclude Tax
-        };
+    const calculatedSummary = {
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        discount: roundedDiscountOnDelivery,
+        platformFee,
+        smileFundDonation
+    };
 
-        return { 
-            subtotal, 
-            shipping: baseShipping, 
-            deliveryDiscount, 
-            deliveryCost, 
-            totalAmount, 
-            calculatedSummary, 
-            selectedItemCount, 
-            allSelected 
-        };
-    }, [cartItems]);
+    // ✅ SINGLE RETURN
+    return { 
+        subtotal, 
+        deliveryDiscount: roundedDiscountOnDelivery,
+        totalAmount: roundedTotalAmount, 
+        calculatedSummary, 
+        selectedItemCount, 
+        allSelected 
+    };
+}, [cartItems]); // only this one
+
     
     // --- Handlers (mostly remain the same) ---
     const handleQuantityChange = async (productId, newQuantity) => { if (newQuantity >= 1) { await updateCartBackend(`update-quantity`, 'PUT', { productId, quantity: newQuantity }); } };
@@ -520,23 +536,23 @@ const CartPage = () => {
                  throw new Error('Please fill in all required address fields.');
             }
 
+            // Order payload only needs final total and summary of non-delivery costs
+            const orderPayload = {
+                 shippingAddress: shippingDetails,
+                 finalAmount: totalAmount, // Use the FE calculated final amount
+                 summary: calculatedSummary, // Send the calculated breakdown
+            };
+
             const response = await fetch(`${API_BASE_URL}/orders/place`, { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken }, 
-                body: JSON.stringify({ shippingAddress: shippingDetails }),
+                body: JSON.stringify(orderPayload),
             });
             const data = await response.json();
             if (!response.ok) { throw new Error(data.msg || (data.errors && data.errors[0].msg) || 'Failed to place order.'); }
             
             // 1. Show Success Message - Set the final summary
-            setFinalOrderSummary({
-                'Subtotal Amount': subtotal,
-                'Discount Amount': deliveryDiscount,
-                'Delivery Cost': deliveryCost,
-                'Platform Fee': PLATFORM_FEE,
-                'Smile Fund Donation': SMILE_FUND_DONATION,
-                'Final Total Amount': totalAmount
-            });
+            setFinalOrderSummary(calculatedSummary);
             setShowOrderSuccess(true); 
             setIsNewAddressModalOpen(false);
 
@@ -663,26 +679,19 @@ const CartPage = () => {
                                 handleProceedToCheckout={handleProceedToCheckout}
                             />
                             
-                            {/* UPDATED Order Summary (Excludes Tax) */}
+                            {/* UPDATED Order Summary */}
                             <div className="bg-white rounded-xl shadow-xl p-6 border border-gray-200 mt-6">
-                                <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Order Summary</h2>
+                                <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center"><DollarSign size={20} className="mr-2 text-green-600" /> Payment Summary</h2>
                                 <div className="space-y-3 text-sm text-gray-600">
-                                    {/* Calculated Summary Details */}
+                                    
+                                    {/* Calculated Summary Details (Simplified) */}
                                     <div className="flex justify-between">
-                                        <span>Subtotal ({selectedItemCount} items)</span>
+                                        <span>Subtotal (Product Value)</span>
                                         <span className="font-medium text-gray-800">₹{subtotal.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between text-gray-500">
-                                        <span>Base Shipping</span>
-                                        <span>₹{shipping.toFixed(2)}</span>
-                                    </div>
                                     <div className="flex justify-between text-red-500">
-                                        <span>Delivery Discount (35% of Margin)</span>
+                                        <span>Discount (5% of Subtotal)</span>
                                         <span>- ₹{deliveryDiscount.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-semibold text-gray-800 border-t pt-2 mt-2">
-                                        <span>Delivery Cost (Final)</span>
-                                        <span>₹{deliveryCost.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Platform Fee</span>
@@ -698,6 +707,9 @@ const CartPage = () => {
                                         <span>₹{totalAmount.toFixed(2)}</span>
                                     </div>
                                 </div>
+                                <p className="text-xs text-red-500 font-medium mt-3 border-t pt-2">
+                                    ⁠Delivery charge will be added additionally and the invoice and payment link will be shared by Hivictus Team shortly
+                                </p>
                             </div>
                         </div>
                     </div>
