@@ -690,7 +690,7 @@ const {
                                         <span className="font-medium text-gray-800">₹{subtotal.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between text-red-500">
-                                        <span>Discount (5% of Subtotal)</span>
+                                        <span>Discount</span>
                                         <span>- ₹{deliveryDiscount.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between">
