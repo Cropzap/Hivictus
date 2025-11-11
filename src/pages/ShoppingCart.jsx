@@ -10,7 +10,7 @@ const FALLBACK_IMAGE_URL = 'https://placehold.co/100x100/E5E7EB/9CA3AF?text=Prod
 // --- CONSTANTS ---
 const PLATFORM_FEE = 2.00;
 const SMILE_FUND_DONATION = 1.00;
-const DELIVERY_DISCOUNT_PERCENTAGE = 0.05; // 5% Discount Rate applied to Subtotal
+const DELIVERY_DISCOUNT_PERCENTAGE = 0.025;// 2.5% Discount Rate applied to Subtotal
 const TAX_RATE = 0.00; 
 
 // ====================================================================
