@@ -14,7 +14,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+// REMOVED: import 'react-toastify/dist/ReactToastify.css';
 
 // API Base URL (Configure this based on your backend environment)
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -73,14 +73,22 @@ const normalizeFilterName = (name) => {
 const renderStars = (rating) => {
   const stars = [];
   const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 !== 0;
+  // Only display partial star if the decimal part is significant
+  const partialStar = rating % 1; 
 
   for (let i = 0; i < fullStars; i++) {
     stars.push(<Star key={`full-${i}`} size={10} fill="#FACC15" color="#FACC15" />);
   }
-  if (hasHalfStar) {
-    stars.push(<Star key="half" size={10} fill="#FACC15" color="#FACC15" opacity={0.5} />);
+  
+  // Renders a half star if there's a decimal component
+  if (partialStar >= 0.25 && partialStar < 0.75) {
+      // NOTE: Lucide doesn't have a half-star component, so we use a full star with opacity/fallback logic
+      stars.push(<Star key="half" size={10} fill="#FACC15" color="#FACC15" opacity={0.5} />);
+  } else if (partialStar >= 0.75) {
+      // If close to a full star, render it as full (can be adjusted based on desired strictness)
+      stars.push(<Star key="near-full" size={10} fill="#FACC15" color="#FACC15" />);
   }
+
   const emptyStars = 5 - stars.length;
   for (let i = 0; i < emptyStars; i++) {
     stars.push(<Star key={`empty-${i}`} size={10} color="#D1D5DB" />);
@@ -122,6 +130,10 @@ const ProductCard = ({ product }) => {
     }
   }, []);
 
+  // Priority: 1. imageUrls[0] 2. FALLBACK_IMAGE_URL
+  const displayImageUrl = product.imageUrls && Array.isArray(product.imageUrls) && product.imageUrls.length > 0
+          ? product.imageUrls
+          : [product.imageUrl || FALLBACK_IMAGE_URL]; 
 const handleAddToCart = async (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -142,7 +154,7 @@ const handleAddToCart = async (e) => {
         productId: product._id,
         name: product.name,
         price: product.price,
-       imageUrl: product.product?.imageUrls?.[0], // ✅ FIXED
+        imageUrl: displayImageUrl, // Use the resolved image URL here
         quantity: 1,
       }),
     });
@@ -155,7 +167,7 @@ const handleAddToCart = async (e) => {
         const errorData = await response.json();
         errorMessage = errorData.message || errorData.msg || "Unknown server error";
       } else {
-        const errorText = await response.text(); // ✅ read once
+        const errorText = await response.text(); 
         errorMessage = errorText || `Server error - ${response.status}`;
       }
 
@@ -169,8 +181,6 @@ const handleAddToCart = async (e) => {
     toast.error(err.message || "Failed to add to cart");
   }
 };
-
-
 
 
   const cardVariants = {
@@ -189,13 +199,11 @@ const handleAddToCart = async (e) => {
       : product.description)
     : 'Fresh and organic produce';
 
-  // --- 🔑 IMAGE FIX START 🔑 ---
-  // Priority: 1. imageUrls[0] (Base64 data URL) 2. imageUrl 3. FALLBACK_IMAGE_URL
-  const displayImageUrl = product.imageUrls && product.imageUrls.length > 0
-    ? product.imageUrls[0]
-    : product.imageUrl || FALLBACK_IMAGE_URL;
-  // --- 🔑 IMAGE FIX END 🔑 ---
-
+  // --- RATING DATA ---
+  const displayRating = product.averageRating !== undefined ? parseFloat(product.averageRating) : 0;
+  const reviewCount = product.totalRatings !== undefined ? parseInt(product.totalRatings, 10) : 0;
+  // --- END RATING DATA ---
+  
   return (
     <motion.div
       className="relative bg-white rounded-xl shadow-lg transition-all duration-300 flex flex-col group border border-gray-100 hover:border-green-400 h-96"
@@ -209,7 +217,7 @@ const handleAddToCart = async (e) => {
         {/* Product Image */}
         <div className="relative w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden">
           <img
-            src={displayImageUrl} // Use the resolved image URL
+            src={displayImageUrl} // 🔑 USE RESOLVED URL HERE
             alt={product.name}
             className="object-cover w-full h-full transition-transform duration-500 ease-out group-hover:scale-110"
             onError={(e) => {
@@ -238,12 +246,13 @@ const handleAddToCart = async (e) => {
           </div>
 
           {/* Short Description & Rating (One Line) */}
-          <div className="flex items-center justify-between text-gray-600 mb-2 border-t pt-2 border-gray-100">
-            <p className="text-gray-500 line-clamp-1 text-xs" title={product.description}>{shortDescription}</p>
+          <div className="flex flex-col justify-between text-gray-600 mb-2 border-t pt-2 border-gray-100">
+            <p className="text-gray-500 line-clamp-1 text-xs mb-1" title={product.description}>{shortDescription}</p>
+            
             {/* Rating Display */}
-            <div className="flex items-center gap-1 text-xs font-semibold whitespace-nowrap">
-              <Star size={12} fill="#FACC15" color="#FACC15" />
-              <span className="text-gray-700">{product.rating ? product.rating.toFixed(1) : 'N/A'}</span>
+            <div className="flex items-center gap-2 text-xs font-semibold whitespace-nowrap">
+              {renderStars(displayRating)}
+              <span className="text-gray-700 font-extrabold">{displayRating > 0 ? displayRating.toFixed(1) : 'N/A'}</span>
             </div>
           </div>
 
@@ -255,8 +264,8 @@ const handleAddToCart = async (e) => {
                 {product.sellerName || 'Local Farm'}
               </span>
             </div>
-            <span className="text-gray-500">
-              ({product.reviewCount || 0} reviews)
+            <span className="text-gray-500 font-semibold">
+              ({reviewCount} reviews)
             </span>
           </div>
         </div>
@@ -306,7 +315,7 @@ const FilterContent = ({
 
     return (
     <>
-      <div className="mb-4 p-3 bg-white rounded-lg shadow-inner">
+      <div className="mb-4 p-3 bg-white rounded-lg shadow-inner border border-gray-200">
         <label htmlFor="searchQuery" className="block text-gray-700 text-xs font-semibold mb-1">
           Quick Search
         </label>
@@ -334,7 +343,7 @@ const FilterContent = ({
           name="category"
           value={filters.category}
           onChange={handleFilterChange}
-          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none shadow-sm"
         >
           {['All', ...allCategories.map(c => c.name)].map((cat) => (
             <option key={cat} value={cat} className="text-sm">
@@ -355,7 +364,7 @@ const FilterContent = ({
             name="subCategory"
             value={filters.subCategory}
             onChange={handleFilterChange}
-            className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+            className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none shadow-sm"
           >
             {getSubcategoriesForSelectedCategory().map((subCat) => (
               <option key={subCat} value={subCat} className="text-sm">
@@ -375,7 +384,7 @@ const FilterContent = ({
           name="type"
           value={filters.type}
           onChange={handleFilterChange}
-          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none shadow-sm"
         >
           {allTypes.map((type) => (
             <option key={type} value={type} className="text-sm">
@@ -385,7 +394,7 @@ const FilterContent = ({
         </select>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
         <label className="block text-gray-700 text-xs font-semibold mb-1">
           Price Range (INR)
         </label>
@@ -396,9 +405,9 @@ const FilterContent = ({
               value={minPrice}
               onChange={handlePriceRangeChange}
               placeholder="Min"
-              step="1"
+              step="10"
               min="0"
-              className="w-1/2 p-2 border border-gray-200 rounded-lg focus:border-green-400 transition-all text-sm"
+              className="w-1/2 p-2 border border-gray-300 rounded-lg focus:border-green-400 transition-all text-sm shadow-inner"
             />
             <span className="text-gray-500 font-bold text-sm">-</span>
             <input
@@ -407,15 +416,46 @@ const FilterContent = ({
               value={maxPrice}
               onChange={handlePriceRangeChange}
               placeholder="Max"
-              step="1"
+              step="10"
               min="0"
-              className="w-1/2 p-2 border border-gray-200 rounded-lg focus:border-green-400 transition-all text-sm"
+              className="w-1/2 p-2 border border-gray-300 rounded-lg focus:border-green-400 transition-all text-sm shadow-inner"
             />
           </div>
-          <p className="text-xs text-gray-500 mt-1">Range: ₹{minPrice} - ₹{maxPrice}</p>
+          <p className="text-xs text-gray-600 mt-2 font-bold">Current Range: ₹{minPrice} - ₹{maxPrice}</p>
+      </div>
+      
+      {/* ⭐️ Min Rating Filter (New Block) */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <label className="block text-gray-700 text-xs font-semibold mb-2">
+          Minimum Rating
+        </label>
+        <div className="flex items-center space-x-2">
+            {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleFilterChange({ target: { name: 'minRating', value: value } })}
+                    className={`p-1 rounded-full border transition-all duration-200 
+                        ${filters.minRating >= value 
+                            ? 'bg-yellow-400 border-yellow-500 text-white shadow-md' 
+                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-100'
+                        }`}
+                >
+                    <Star size={16} fill={filters.minRating >= value ? 'currentColor' : 'none'} color="currentColor" />
+                </button>
+            ))}
+            {filters.minRating > 0 && (
+                <button
+                    onClick={() => handleFilterChange({ target: { name: 'minRating', value: 0 } })}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium ml-2"
+                >
+                    Clear ({filters.minRating}+)
+                </button>
+            )}
+        </div>
       </div>
 
-      <div className="mb-5">
+      <div className="mb-4">
         <label htmlFor="sortBy" className="block text-gray-700 text-xs font-semibold mb-1">
           Sort By
         </label>
@@ -424,7 +464,7 @@ const FilterContent = ({
           name="sortBy"
           value={filters.sortBy}
           onChange={handleFilterChange}
-          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none"
+          className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:border-green-400 transition-all text-sm appearance-none shadow-sm"
         >
           <option value="default">Best Match</option>
           <option value="price-asc">Price: Low to High</option>
@@ -432,21 +472,21 @@ const FilterContent = ({
           <option value="rating-desc">Rating: High to Low</option>
         </select>
       </div>
-
-      {/* Mobile-specific button to close and apply filters */}
-      <button
-        onClick={closeFilterPanel}
-        className="lg:hidden w-full bg-green-600 text-white px-3 py-3 rounded-lg flex items-center justify-center font-bold text-base shadow-md hover:bg-green-700 transition-colors mt-6"
-      >
-        Apply Filters
-      </button>
       
       {/* Universal Reset button */}
       <button
         onClick={resetFilters}
-        className="w-full bg-red-500 text-white px-3 py-2 rounded-lg flex items-center justify-center font-bold text-sm shadow-md hover:bg-red-600 transition-colors mt-3"
+        className="w-full bg-red-500 text-white px-3 py-2 rounded-lg flex items-center justify-center font-bold text-sm shadow-md hover:bg-red-600 transition-colors mt-6"
       >
         <RefreshCcw className="mr-2" size={14} /> Reset Filters
+      </button>
+
+      {/* Mobile-specific button to close and apply filters */}
+      <button
+        onClick={closeFilterPanel}
+        className="lg:hidden w-full bg-green-600 text-white px-3 py-3 rounded-lg flex items-center justify-center font-bold text-base shadow-xl hover:bg-green-700 transition-colors mt-3"
+      >
+        Apply & View Results
       </button>
     </>
   )
@@ -455,6 +495,15 @@ const FilterContent = ({
 // --- Categories Bar Component (Scrollable and Animated) ---
 const CategoriesBar = ({ categories, onSelect, selectedCategory }) => {
   const scrollRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768); 
+
+  useEffect(() => {
+    const handleResize = () => {
+        setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const allCategory = { name: 'All', mainImage: 'https://placehold.co/100x100/F0FDF4/15803D?text=All' };
   // The 'categories' prop is expected to be an array of category objects from the backend.
@@ -493,7 +542,7 @@ const CategoriesBar = ({ categories, onSelect, selectedCategory }) => {
                         key={index}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.05 }}
+                        transition={{ delay: isMobile ? 0 : index * 0.05 }}
                         className={`flex flex-col items-center cursor-pointer p-1 rounded-xl transition-all duration-300 hover:bg-green-50/50 hover:shadow-sm min-w-[70px]
                           ${selectedCategory === category.name
                             ? 'bg-green-100 border-2 border-green-600 text-green-700 font-extrabold shadow-inner'
@@ -546,6 +595,7 @@ const Products = () => {
   const [error, setError] = useState(null);
   const [categories, setCategories] = useState([]);
   const [allTypes, setAllTypes] = useState([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024); // Check against lg breakpoint
 
   // Get initial values from URL on load
   const initialCategory = cleanName(searchParams.get('category'));
@@ -561,6 +611,16 @@ const Products = () => {
   });
 
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  
+  // Update isMobile state on resize
+  useEffect(() => {
+    const handleResize = () => {
+        setIsMobile(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 
   // Combine local state filters with URL-derived filters
   const currentFilters = useMemo(() => ({
@@ -613,8 +673,9 @@ const Products = () => {
           ...p,
           // Safely access seller name
           sellerName: p.sellerId?.sellerName || p.sellerId?.companyName || 'Local Farm',
-          rating: p.rating !== undefined ? parseFloat(p.rating) : 5.0,
-          reviewCount: p.reviewCount !== undefined ? parseInt(p.reviewCount, 10) : 0,
+          // ⭐️ UPDATED: Use backend's computed average and total ratings
+          averageRating: p.averageRating !== undefined ? parseFloat(p.averageRating) : 0,
+          totalRatings: p.totalRatings !== undefined ? parseInt(p.totalRatings, 10) : 0,
           category: p.category && typeof p.category === 'object' ? p.category : { name: 'Unknown' },
         }));
 
@@ -685,7 +746,8 @@ const Products = () => {
 
     // 5. Min Rating Filter
     if (currentFilters.minRating > 0) {
-      temp = temp.filter((p) => p.rating >= currentFilters.minRating);
+      // ⭐️ Filter using the new averageRating field
+      temp = temp.filter((p) => p.averageRating >= currentFilters.minRating);
     }
 
     // 6. Search Query Filter
@@ -710,7 +772,8 @@ const Products = () => {
         temp.sort((a, b) => (b.price || 0) - (a.price || 0));
         break;
       case 'rating-desc':
-        temp.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        // ⭐️ Sort using the new averageRating field
+        temp.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
         break;
       default:
         // No sort or default is 'best match' (which is the order from the API)
@@ -762,7 +825,7 @@ const Products = () => {
         return;
     }
 
-    // Logic for other local filters (type, sortBy, searchQuery)
+    // Logic for other local filters (type, sortBy, searchQuery, minRating)
     setLocalFilters((prev) => ({
       ...prev,
       [name]: value,
@@ -848,7 +911,20 @@ const Products = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pt-10">
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
+      {/* Inline style hack for ToastContainer, replacing the failed CSS import */}
+      <ToastContainer 
+        position="top-right" 
+        autoClose={3000} 
+        hideProgressBar 
+        newestOnTop={false} 
+        closeOnClick 
+        rtl={false} 
+        pauseOnFocusLoss 
+        draggable 
+        pauseOnHover 
+        style={{ zIndex: 9999, top: '10px', right: '10px', width: '320px' }} // Basic positioning and width
+        toastClassName={() => "bg-white text-gray-900 shadow-lg rounded-lg border border-gray-200 p-3 flex items-center"} // Custom class for toasts
+      />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-extrabold text-gray-900 mb-6 text-center">
@@ -945,7 +1021,7 @@ const Products = () => {
                   name="sortBy"
                   value={currentFilters.sortBy}
                   onChange={handleFilterChange}
-                  className="p-2 border border-gray-300 rounded-lg bg-white text-sm"
+                  className="p-2 border border-gray-300 rounded-lg bg-white text-sm shadow-sm"
                 >
                   <option value="default">Best Match</option>
                   <option value="price-asc">Price: Low to High</option>
@@ -973,7 +1049,7 @@ const Products = () => {
                     <p className="text-sm text-gray-500 mt-2">Try adjusting your price range, category, or search query.</p>
                     <button
                         onClick={resetFilters}
-                        className="mt-6 bg-green-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-600 transition-colors"
+                        className="mt-6 bg-green-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-600 transition-colors shadow-md"
                     >
                         Reset All Filters
                     </button>

@@ -410,7 +410,7 @@ const Navbar = ({ isLoggedIn, handleLogout }) => { // 👈 Prop received
                 results.push({
                     categoryName: cat.name,
                     subcategoryName: sub.name,
-                    imageUrl: sub.imageUrl,
+                    imageUrl: sub.image,
                 });
             }
         });
