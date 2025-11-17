@@ -107,7 +107,7 @@ const PriceUnit = ({ price, unit }) => {
 
   return (
     <div className="flex items-end text-sm">
-      <span className="text-lg font-extrabold text-green-700">
+      <span className="text-xl font-extrabold text-green-700">
         {formattedPrice}
       </span>
       {unit && (
@@ -131,9 +131,9 @@ const ProductCard = ({ product }) => {
   }, []);
 
   // Priority: 1. imageUrls[0] 2. FALLBACK_IMAGE_URL
-  const displayImageUrl = product.imageUrls && Array.isArray(product.imageUrls) && product.imageUrls.length > 0
-          ? product.imageUrls
-          : [product.imageUrl || FALLBACK_IMAGE_URL]; 
+  const displayImageUrl = product.imageUrls && product.imageUrls.length > 0
+    ? product.imageUrls[0]
+    : product.imageUrl || FALLBACK_IMAGE_URL;
 const handleAddToCart = async (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -206,7 +206,8 @@ const handleAddToCart = async (e) => {
   
   return (
     <motion.div
-      className="relative bg-white rounded-xl shadow-lg transition-all duration-300 flex flex-col group border border-gray-100 hover:border-green-400 h-96"
+      // ⭐️ INCREASED HEIGHT to h-[440px] for more space. Width is controlled by grid.
+      className="relative bg-white rounded-xl shadow-lg transition-all duration-300 flex flex-col group border border-gray-100 hover:border-green-400 h-[440px]"
       variants={cardVariants}
       initial="hidden"
       animate="visible"
@@ -215,7 +216,7 @@ const handleAddToCart = async (e) => {
     >
       <Link to={`/product/${product._id}`} className="flex flex-col h-full">
         {/* Product Image */}
-        <div className="relative w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden">
+        <div className="relative w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden rounded-t-xl">
           <img
             src={displayImageUrl} // 🔑 USE RESOLVED URL HERE
             alt={product.name}
@@ -233,10 +234,10 @@ const handleAddToCart = async (e) => {
           )}
         </div>
 
-        {/* Product Details */}
-        <div className="p-4 flex flex-col flex-grow text-xs">
-          {/* Name - Reduced to text-base */}
-          <h3 className="font-extrabold text-gray-800 line-clamp-2 mb-1 text-base leading-tight">
+        {/* Product Details (Now includes the button) */}
+        <div className="p-4 flex flex-col flex-grow text-sm">
+          {/* Name - text-lg for prominence */}
+          <h3 className="font-extrabold text-gray-800 line-clamp-2 mb-2 text-lg leading-snug">
             {product.name}
           </h3>
 
@@ -244,56 +245,54 @@ const handleAddToCart = async (e) => {
           <div className="flex items-center justify-between mb-2">
             <PriceUnit price={product.price} unit={product.unit} />
           </div>
-
-          {/* Short Description & Rating (One Line) */}
-          <div className="flex flex-col justify-between text-gray-600 mb-2 border-t pt-2 border-gray-100">
-            <p className="text-gray-500 line-clamp-1 text-xs mb-1" title={product.description}>{shortDescription}</p>
-            
-            {/* Rating Display */}
-            <div className="flex items-center gap-2 text-xs font-semibold whitespace-nowrap">
+          
+          {/* Rating Display */}
+          <div className="flex items-center gap-2 text-xs font-semibold whitespace-nowrap mb-3">
               {renderStars(displayRating)}
               <span className="text-gray-700 font-extrabold">{displayRating > 0 ? displayRating.toFixed(1) : 'N/A'}</span>
-            </div>
           </div>
 
-          {/* Seller Info and Review Count (Bottom) - Smaller text */}
-          <div className="flex items-center justify-between text-gray-600 mt-auto text-[10px]">
-            <div className="flex items-center">
-              <User className="mr-1 text-green-400" size={10} />
-              <span className="font-medium line-clamp-1 text-gray-700">
+          {/* Short Description */}
+          <p className="text-gray-500 line-clamp-2 text-xs mb-3 flex-grow" title={product.description}>{shortDescription}</p>
+
+          {/* ⭐️ ADD TO CART BUTTON MOVED HERE (Inside the content area) */}
+          <motion.button
+            className={`w-full py-2 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-300 shadow-md mb-3
+              ${isOutOfStock
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            title={isOutOfStock ? 'Out of Stock' : 'Add to Basket'}
+            whileHover={{ scale: isOutOfStock ? 1 : 1.02 }}
+            whileTap={{ scale: isOutOfStock ? 1 : 0.98 }}
+            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+          >
+            {isOutOfStock ? (
+              'Out of Stock'
+            ) : (
+              <>
+                <ShoppingCart size={16} className="mr-2" /> Add to Basket
+              </>
+            )}
+          </motion.button>
+
+          {/* ⭐️ Seller Info and Review Count (One Line, using grid for truncation) */}
+          <div className="grid grid-cols-[1fr_auto] items-center text-gray-600 border-t pt-2 border-gray-100 mt-auto text-xs">
+            <div className="flex items-center min-w-0">
+              <User className="mr-1 text-green-400 flex-shrink-0" size={12} />
+              {/* ⭐️ Line-clamp-1 ensures the text truncates if it's too long, keeping reviews on the same line */}
+              <span className="font-medium text-gray-700 line-clamp-1 overflow-hidden text-ellipsis">
                 {product.sellerName || 'Local Farm'}
               </span>
             </div>
-            <span className="text-gray-500 font-semibold">
+            {/* whitespace-nowrap ensures review count stays together */}
+            <span className="text-gray-500 font-semibold whitespace-nowrap ml-2 text-right">
               ({reviewCount} reviews)
             </span>
           </div>
         </div>
       </Link>
-
-      {/* Add to Cart Button (Fixed at bottom) */}
-      <div className="p-4 pt-0">
-        <motion.button
-          className={`w-full py-2.5 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-300 shadow-md
-            ${isOutOfStock
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
-          title={isOutOfStock ? 'Out of Stock' : 'Add to Basket'}
-          whileHover={{ scale: isOutOfStock ? 1 : 1.02 }}
-          whileTap={{ scale: isOutOfStock ? 1 : 0.98 }}
-          onClick={handleAddToCart}
-          disabled={isOutOfStock}
-        >
-          {isOutOfStock ? (
-            'Out of Stock'
-          ) : (
-            <>
-              <ShoppingCart size={16} className="mr-2" /> Add to Basket
-            </>
-          )}
-        </motion.button>
-      </div>
     </motion.div>
   );
 };
