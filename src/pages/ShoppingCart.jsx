@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Minus, Plus, ChevronLeft, Trash2, Check, X, Loader, MapPin, Phone, User, PlusCircle, Smile, Truck, DollarSign } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, ChevronLeft, Trash2, Check, X, Loader, MapPin, Phone, User, PlusCircle, XCircle, CheckCircle, Smile, Truck, DollarSign, Tag } from 'lucide-react';
 import { useCart } from '../context/CartContext'; // Assuming this context exists
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -10,8 +10,116 @@ const FALLBACK_IMAGE_URL = 'https://placehold.co/100x100/E5E7EB/9CA3AF?text=Prod
 // --- CONSTANTS ---
 const PLATFORM_FEE = 2.00;
 const SMILE_FUND_DONATION = 1.00;
-const DELIVERY_DISCOUNT_PERCENTAGE = 0.025;// 2.5% Discount Rate applied to Subtotal
-const TAX_RATE = 0.00; 
+const TAX_RATE = 0.00;
+
+// ====================================================================
+// --- DELIVERY & UNIT CONVERSION UTILITIES ---
+// ====================================================================
+
+/**
+ * Converts a product's quantity and unit into weight in Kilograms (KG).
+ * For non-weight units (piece, jar, etc.), it relies on a weightPerUnitKg field 
+ * from the product details, defaulting to 0.25 kg if not found.
+ */
+const getUnitWeightKg = (quantity, unit, productDetails) => {
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) return 0;
+    
+    const lowerUnit = unit.toLowerCase().trim();
+    
+    // Default fallback weight for counted items (piece, jar, etc.)
+    let calculatedWeight = 0;
+
+    // 1. Handle standard weight/volume units (KG, G, L, ML)
+    switch (lowerUnit) {
+        case 'kg':
+        case 'kilogram':
+        case 'l':
+        case 'liter':
+            return qty; // 1:1 conversion (1 kg, 1 liter = 1 kg)
+            
+        case 'g':
+        case 'gram':
+            return qty / 1000; // Grams to KG
+            
+        case 'ml':
+        case 'milliliter':
+            return qty / 1000; // Milliliters to KG
+            
+        case 'piece':
+        case 'bunch':
+        case 'unit':
+        case 'jar':
+            // 2. Handle counted units: Use weightPerUnitKg if available, otherwise default to 0.25kg
+            let weightPerUnit = 0.25; 
+            if (productDetails?.weightPerUnitKg) {
+                weightPerUnit = parseFloat(productDetails.weightPerUnitKg);
+            }
+            return qty * weightPerUnit; 
+            
+        default:
+            // 3. Attempt to parse compound units (like "500g")
+            const matchMass = lowerUnit.match(/^(\d+(\.\d+)?)\s?(g|kg|l|ml)$/);
+            
+            if (matchMass) {
+                const value = parseFloat(matchMass[1]);
+                const unitType = matchMass[3];
+                
+                if (unitType === 'g') calculatedWeight = value / 1000;
+                else if (unitType === 'kg' || unitType === 'l') calculatedWeight = value;
+                else if (unitType === 'ml') calculatedWeight = value / 1000;
+                
+                return qty * calculatedWeight;
+            }
+
+            console.warn(`Unknown unit '${unit}'. Assuming 1 unit = 1 kg.`);
+            return qty; // Default to 1 unit = 1 kg if all parsing fails
+    }
+};
+
+/**
+ * Calculates the final delivery charge including the 5% product value discount.
+ *
+ * Formula:
+ * 1. Actual Delivery Cost:
+ * - If totalWeightKg <= 2 KG: Rs 90
+ * - Else: Rs 90 + (Rs 35 * (Ceiling(Total weight - 2 KG)))
+ * 2. Delivery Discount: Product value * 5/100
+ * 3. Final Delivery Charge = Actual Delivery Cost - Delivery Discount (min 0)
+ *
+ * @param {number} totalWeightKg - Total weight of selected items in kilograms.
+ * @param {number} productSubtotal - Total value of selected items.
+ * @returns {object} { actualDeliveryCost, deliveryDiscountAmount, finalDeliveryCharge }
+ */
+const calculateDeliveryCharge = (totalWeightKg, productSubtotal) => {
+    const BASE_KG = 2;
+    const BASE_COST = 90;
+    const ADDITIONAL_KG_RATE = 35;
+    const DISCOUNT_RATE = 0.05; // 5%
+
+    let actualDeliveryCost;
+    
+    // Step 1: Calculate Actual Delivery Cost (Weight-based)
+    if (totalWeightKg <= BASE_KG) {
+        actualDeliveryCost = BASE_COST;
+    } else {
+        const additionalWeight = Math.ceil(totalWeightKg - BASE_KG); 
+        actualDeliveryCost = BASE_COST + (ADDITIONAL_KG_RATE * additionalWeight);
+    }
+    
+    // Step 2: Calculate Delivery Discount (5% of Product Value)
+    const deliveryDiscountAmount = productSubtotal * DISCOUNT_RATE;
+    
+    // Step 3: Calculate Final Delivery Charge (Actual Cost - Discount, cannot be negative)
+    let finalDeliveryCharge = actualDeliveryCost - deliveryDiscountAmount;
+    finalDeliveryCharge = Math.max(0, finalDeliveryCharge);
+
+    return {
+        actualDeliveryCost: parseFloat(actualDeliveryCost.toFixed(2)),
+        deliveryDiscountAmount: parseFloat(deliveryDiscountAmount.toFixed(2)),
+        finalDeliveryCharge: parseFloat(finalDeliveryCharge.toFixed(2)),
+    };
+};
 
 // ====================================================================
 // --- PROFILE ADDRESS MODEL MAPPING (Unchanged) ---
@@ -45,8 +153,9 @@ const OrderSuccessScreen = ({ totalAmount, orderDetails }) => {
 
     if (!isVisible) return null;
 
+    // Filter out internal summary details (Actual Cost and 5% Discount for clean UI)
     const filteredOrderDetails = Object.entries(orderDetails)
-        .filter(([key]) => !key.toLowerCase().includes('tax'));
+        .filter(([key]) => key !== 'Actual Delivery Cost' && key !== 'Product Value Discount (5%)' && !key.toLowerCase().includes('tax'));
     
     return (
         <motion.div
@@ -99,7 +208,7 @@ const OrderSuccessScreen = ({ totalAmount, orderDetails }) => {
 
 
 // ====================================================================
-// --- New Address Modal Component (Unchanged Flow) ---
+// --- New Address Modal Component (Hiding internal details) ---
 // ====================================================================
 
 const InputField = ({ label, name, type = 'text', value, onChange, required = false }) => (
@@ -119,8 +228,9 @@ const InputField = ({ label, name, type = 'text', value, onChange, required = fa
 
 const AddNewAddressModal = ({ isOpen, onClose, onPlaceOrder, shippingDetails, onShippingChange, total, orderSummary, isPlacingOrder }) => {
     
+    // Filter out internal summary details that we don't need in the final modal (Actual Cost and 5% Discount)
     const filteredOrderSummary = Object.entries(orderSummary)
-        .filter(([key]) => !key.toLowerCase().includes('delivery cost') && !key.toLowerCase().includes('charge'));
+        .filter(([key]) => key !== 'Actual Delivery Cost' && key !== 'Product Value Discount (5%)');
 
     return (
         <AnimatePresence>
@@ -164,7 +274,7 @@ const AddNewAddressModal = ({ isOpen, onClose, onPlaceOrder, shippingDetails, on
                                         {filteredOrderSummary.map(([key, value]) => (
                                             <div key={key} className="flex justify-between">
                                                 <span>{key}</span>
-                                                <span className="font-medium text-gray-800">₹{value.toFixed(2)}</span>
+                                                <span className={`font-medium ${key.includes('Discount') ? 'text-red-600' : 'text-gray-800'}`}>{key.includes('Discount') ? `- ` : ``}₹{value.toFixed(2)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -173,10 +283,6 @@ const AddNewAddressModal = ({ isOpen, onClose, onPlaceOrder, shippingDetails, on
                                             <span>Total to Pay:</span>
                                             <span>₹{total.toFixed(2)}</span>
                                         </div>
-                                        {/* ADDED DELIVERY CHARGE MESSAGE */}
-                                        <p className="text-xs text-red-500 font-medium mt-1">
-                                            Delivery charges will be calculated and the payment QR code will be shared separately.
-                                        </p>
                                     </div>
                                 </div>
                                 <motion.button
@@ -303,7 +409,11 @@ const CartPage = () => {
     const [showOrderSuccess, setShowOrderSuccess] = useState(false); 
     const [finalOrderSummary, setFinalOrderSummary] = useState({});
     
-    // NEW STATES
+    // STATES FOR PROMO CODE 
+    const [promoCode, setPromoCode] = useState(null);
+    const [promoDiscount, setPromoDiscount] = useState(0); 
+    
+    // Other States
     const [profileData, setProfileData] = useState(null);
     const [selectedAddress, setSelectedAddress] = useState('profile'); 
     const [shippingDetails, setShippingDetails] = useState({
@@ -312,7 +422,7 @@ const CartPage = () => {
 
     const { fetchCartQuantity } = useCart();
 
-    // --- Auth & Initial Fetch ---
+    // --- Auth & Initial Fetch (Unchanged) ---
     useEffect(() => {
         const token = localStorage.getItem('authToken');
         if (token) {
@@ -323,7 +433,7 @@ const CartPage = () => {
         }
     }, []);
 
-    // --- Toast Functions ---
+    // --- Toast Functions (Unchanged) ---
     const showToastMessage = useCallback((message, type = 'success') => {
         setToastMessage(message);
         setToastType(type);
@@ -331,7 +441,7 @@ const CartPage = () => {
         setTimeout(() => setShowToast(false), 3000);
     }, []);
 
-    // --- Profile Fetch for Pre-fill & Address ---
+    // --- Profile Fetch for Pre-fill & Address (Unchanged) ---
     const fetchUserProfile = useCallback(async () => {
         if (!authToken) return;
         try {
@@ -339,11 +449,8 @@ const CartPage = () => {
             if (res.ok) {
                 const profileData = await res.json();
                 setProfileData(profileData);
-                
-                // Initial setup of shipping details using profile data
                 const mappedDetails = mapProfileToShipping(profileData, profileData.address);
                 setShippingDetails(mappedDetails);
-                
             } else {
                 console.warn("Could not fetch user profile or no profile data returned.");
             }
@@ -357,7 +464,7 @@ const CartPage = () => {
     }, [authToken, fetchUserProfile]);
 
 
-    // --- Cart Fetching ---
+    // --- Cart Fetching (Minimal change in mapping) ---
     const fetchCart = useCallback(async () => {
         if (!authToken) { setLoading(false); return; }
         setLoading(true);
@@ -378,26 +485,18 @@ const CartPage = () => {
                 .map(item => {
                     const product = item.productId; 
                     
-                    // DEFENSIVE PARSING: Convert to number and fallback to 0
-                    const deliveryCharge = parseFloat(product.deliveryCharges || 0) || 0;
-                    const netReceivable = parseFloat(product.netReceivable || 0) || 0;
-                    const platformEarnings = parseFloat(product.platformEarnings || 0) || 0;
+                    // Check if 'unit' is available; fall back gracefully
+                    const itemUnit = product.unit || 'piece';
                     
-                    if (deliveryCharge === 0 && product.deliveryCharges !== 0 && product.deliveryCharges !== undefined && product.deliveryCharges !== null) {
-                        console.warn(`Delivery Charge for product ${product._id} parsed as 0. Raw data received:`, product.deliveryCharges);
-                    }
-
                     return {
                         productId: product._id, 
                         name: product.name, 
                         price: product.price, 
-                        unit: product.unit,
+                        unit: itemUnit, // Use the unit from product schema
                         
-                        deliveryChargeProduct: deliveryCharge, // Using the strictly parsed value
-                        netReceivableProduct: netReceivable, 
-                        platformEarningsProduct: platformEarnings, 
-                        
+                        // Pass full product details for weight calculation
                         productDetails: product, 
+                        
                         imageUrl: product.imageUrls?.[0] || product.imageUrl, 
                         quantity: item.quantity, 
                         isSelected: item.isSelected !== undefined ? item.isSelected : true
@@ -416,7 +515,7 @@ const CartPage = () => {
         if (authToken) { fetchCart(); }
     }, [authToken, fetchCart]);
     
-    // --- Cart Backend Update Utility (remains the same) ---
+    // --- Cart Backend Update Utility (Unchanged) ---
     const updateCartBackend = useCallback(async (endpoint, method, body = {}) => {
         if (!authToken) { showToastMessage('Authentication required.', 'error'); return false; }
         try {
@@ -432,66 +531,122 @@ const CartPage = () => {
             return false;
         }
     }, [authToken, fetchCart, fetchCartQuantity, showToastMessage]);
+    
+    // --- PROMO CODE HANDLERS (Unchanged) ---
+    const handleDiscountApplied = useCallback((discountAmount, code) => {
+        setPromoDiscount(discountAmount);
+        setPromoCode(code);
+        showToastMessage(`Code ${code} applied! Saved ₹${discountAmount.toFixed(2)}.`, 'success');
+    }, [showToastMessage]);
+    
+    const handleDiscountRemoved = useCallback(() => {
+        setPromoDiscount(0);
+        setPromoCode(null);
+        showToastMessage('Promo code removed.', 'success');
+    }, [showToastMessage]);
 
-    // --- UPDATED Calculations: FINAL SIMPLIFIED LOGIC ---
-const { 
-    subtotal, 
-    deliveryDiscount, 
-    totalAmount, 
-    calculatedSummary, 
-    selectedItemCount, 
-    allSelected 
-} = useMemo(() => {
-    const selectedItems = cartItems.filter(item => item.isSelected);
 
-    const subtotal = selectedItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
-    const selectedItemCount = selectedItems.length;
-    const allSelected = cartItems.length > 0 && selectedItemCount === cartItems.length;
-
-    const discountPercentage = DELIVERY_DISCOUNT_PERCENTAGE; // 0.05
-    const discountOnDelivery = subtotal * discountPercentage;
-    const roundedDiscountOnDelivery = parseFloat(discountOnDelivery.toFixed(2));
-
-    const platformFee = PLATFORM_FEE;
-    const smileFundDonation = SMILE_FUND_DONATION;
-
-    const totalAmount = subtotal - roundedDiscountOnDelivery + platformFee + smileFundDonation;
-    const roundedTotalAmount = parseFloat(totalAmount.toFixed(2));
-
-    const calculatedSummary = {
-        subtotal: parseFloat(subtotal.toFixed(2)),
-        discount: roundedDiscountOnDelivery,
-        platformFee,
-        smileFundDonation
-    };
-
-    // ✅ SINGLE RETURN
-    return { 
-        subtotal, 
-        deliveryDiscount: roundedDiscountOnDelivery,
-        totalAmount: roundedTotalAmount, 
+    // --- UPDATED CALCULATIONS: New Weight/Delivery Logic with 5% Product Discount ---
+    const { 
+        originalSubtotal,
+        totalWeightKg,
+        deliveryDetails,
+        promoDiscountAmount,
+        totalAmount, 
         calculatedSummary, 
         selectedItemCount, 
         allSelected 
-    };
-}, [cartItems]); // only this one
+    } = useMemo(() => {
+        const selectedItems = cartItems.filter(item => item.isSelected);
 
-    
-    // --- Handlers (mostly remain the same) ---
-    const handleQuantityChange = async (productId, newQuantity) => { if (newQuantity >= 1) { await updateCartBackend(`update-quantity`, 'PUT', { productId, quantity: newQuantity }); } };
-    const handleDeleteItem = async (productId) => { if (await updateCartBackend(`remove/${productId}`, 'DELETE')) { showToastMessage('Item removed from cart.', 'error'); } };
-    const handleToggleSelect = async (productId) => { const item = cartItems.find(i => i.productId === productId); if (item) { await updateCartBackend('toggle-select', 'PUT', { productId, isSelected: !item.isSelected }); } };
+        // 1. Calculate Base Subtotal
+        const baseSubtotal = selectedItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+        const roundedBaseSubtotal = parseFloat(baseSubtotal.toFixed(2));
+        
+        // 2. Calculate Total Weight using unit conversion
+        const calculatedTotalWeight = selectedItems.reduce((total, item) => {
+            return total + getUnitWeightKg(item.quantity, item.unit, item.productDetails);
+        }, 0);
+        
+        // 3. Calculate Delivery Charges (Actual Cost - 5% Product Value Discount)
+        const deliveryCalculation = calculateDeliveryCharge(calculatedTotalWeight, roundedBaseSubtotal); 
+        
+        // 4. Apply Promo Code Discount
+        // The subtotal for promo check includes the calculated delivery charge.
+        const subtotalBeforePromo = roundedBaseSubtotal + deliveryCalculation.finalDeliveryCharge;
+        const calculatedPromoDiscount = Math.min(promoDiscount, subtotalBeforePromo);
+        const roundedPromoDiscount = parseFloat(calculatedPromoDiscount.toFixed(2));
+        
+        // 5. Fixed Fees/Donations
+        const platformFee = PLATFORM_FEE;
+        const smileFundDonation = SMILE_FUND_DONATION;
+
+        // 6. Calculate Final Total
+        // Start with Base Subtotal
+        // + Add Final Delivery Charge (Actual Cost - 5% Product Discount)
+        // - Subtract Promo Discount
+        // + Add Fixed Fees
+        const finalTotal = roundedBaseSubtotal 
+                            + deliveryCalculation.finalDeliveryCharge
+                            - roundedPromoDiscount
+                            + platformFee 
+                            + smileFundDonation;
+                            
+        const roundedTotalAmount = parseFloat(finalTotal.toFixed(2));
+
+        // 7. Create Summary Object (All values needed for DB storage)
+        const calculatedSummary = {
+            'Subtotal (Product Value)': roundedBaseSubtotal,
+            'Actual Delivery Cost': deliveryCalculation.actualDeliveryCost,
+            'Product Value Discount (5%)': deliveryCalculation.deliveryDiscountAmount, 
+            'Net Delivery Charge': deliveryCalculation.finalDeliveryCharge,
+            'Promo Code Discount': roundedPromoDiscount, 
+            'Platform Fee': platformFee,
+            'Smile Fund Donation': smileFundDonation
+        };
+
+        return { 
+            originalSubtotal: roundedBaseSubtotal, 
+            totalWeightKg: calculatedTotalWeight,
+            deliveryDetails: deliveryCalculation,
+            promoDiscountAmount: roundedPromoDiscount, 
+            totalAmount: roundedTotalAmount, 
+            calculatedSummary, 
+            selectedItemCount: selectedItems.length, 
+            allSelected: cartItems.length > 0 && selectedItems.length === cartItems.length
+        };
+    }, [cartItems, promoDiscount]); 
+
+
+    // --- Handlers (mostly unchanged) ---
+    const handleQuantityChange = async (productId, newQuantity) => { 
+        if (newQuantity >= 1) { 
+            await updateCartBackend(`update-quantity`, 'PUT', { productId, quantity: newQuantity }); 
+            if (promoDiscount > 0) handleDiscountRemoved(); // Reset discount to force re-validation
+        } 
+    };
+    const handleDeleteItem = async (productId) => { 
+        if (await updateCartBackend(`remove/${productId}`, 'DELETE')) { 
+            if (promoDiscount > 0) handleDiscountRemoved(); 
+            showToastMessage('Item removed from cart.', 'error'); 
+        } 
+    };
+    const handleToggleSelect = async (productId) => { 
+        const item = cartItems.find(i => i.productId === productId); 
+        if (item) { 
+            await updateCartBackend('toggle-select', 'PUT', { productId, isSelected: !item.isSelected }); 
+            if (promoDiscount > 0) handleDiscountRemoved();
+        } 
+    };
     const handleSelectAll = async () => { await updateCartBackend('toggle-select-all', 'PUT', { selectAll: !allSelected }); };
 
-    // NEW ADDRESS SELECTION HANDLERS (Unchanged)
+    // ADDRESS, CHECKOUT, AND ORDER PLACEMENT LOGIC (Unchanged flow, uses new calculatedSummary)
     const handleSelectAddress = (addressType) => {
         setSelectedAddress(addressType);
         if (addressType === 'profile' && profileData) {
-            // Use the saved profile address
             const mappedDetails = mapProfileToShipping(profileData, profileData.address);
             setShippingDetails(mappedDetails);
         } else if (addressType === 'new') {
-            // Clear address fields but keep name/phone for quick entry
             setShippingDetails(prev => ({
                 ...prev,
                 address1: '', address2: '', city: '', postalCode: '', country: 'India'
@@ -500,29 +655,12 @@ const {
         }
     };
 
-    const handleAddNewAddress = () => {
-        handleSelectAddress('new');
-    };
-    
-    // Adjusted Checkout Logic (Unchanged flow, opens the modal)
+    const handleAddNewAddress = () => { handleSelectAddress('new'); };
     const handleProceedToCheckout = () => { 
-        if (selectedItemCount === 0) {
-            showToastMessage('Please select items to proceed.', 'error'); 
-            return; 
-        }
-        
-        if (!profileData || !profileData.address || !profileData.address.street) {
-            // If no saved address, open the new address modal immediately
-            handleAddNewAddress();
-            return;
-        }
-        
-        // If an address is selected (profile or new), open modal for final review/submission
-        if (selectedAddress === 'profile' && profileData.address.street || selectedAddress === 'new') {
-            setIsNewAddressModalOpen(true); 
-        } else {
-            showToastMessage('Please select or add a shipping address.', 'error'); 
-        }
+        if (selectedItemCount === 0) { showToastMessage('Please select items to proceed.', 'error'); return; }
+        if (!profileData || !profileData.address || !profileData.address.street) { handleAddNewAddress(); return; }
+        if (selectedAddress === 'profile' && profileData.address.street || selectedAddress === 'new') { setIsNewAddressModalOpen(true); } 
+        else { showToastMessage('Please select or add a shipping address.', 'error'); }
     };
     
     const handleShippingChange = (e) => { setShippingDetails({ ...shippingDetails, [e.target.name]: e.target.value }); };
@@ -536,16 +674,19 @@ const {
                  throw new Error('Please fill in all required address fields.');
             }
 
-            // Order payload only needs final total and summary of non-delivery costs
+            // ORDER PAYLOAD: INCLUDES PROMO CODE DATA 
             const orderPayload = {
                  shippingAddress: shippingDetails,
-                 finalAmount: totalAmount, // Use the FE calculated final amount
-                 summary: calculatedSummary, // Send the calculated breakdown
+                 finalAmount: totalAmount, 
+                 summary: calculatedSummary, 
+                 originalSubtotal: originalSubtotal, 
+                 promoCode: promoCode, 
+                 discountAmount: promoDiscountAmount, 
             };
 
             const response = await fetch(`${API_BASE_URL}/orders/place`, { 
                 method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken }, 
+                headers: { 'x-auth-token': authToken, 'Content-Type': 'application/json' }, 
                 body: JSON.stringify(orderPayload),
             });
             const data = await response.json();
@@ -555,9 +696,12 @@ const {
             setFinalOrderSummary(calculatedSummary);
             setShowOrderSuccess(true); 
             setIsNewAddressModalOpen(false);
-
-            // 2. Clear the cart on success 
+            
+            // 2. Clear state and cart
             setCartItems([]); 
+            setPromoCode(null);
+            setPromoDiscount(0);
+            
             await updateCartBackend('clear-all', 'DELETE'); // Clear cart on backend
             await fetchCartQuantity(); // Update cart icon count
             
@@ -569,7 +713,7 @@ const {
         }
     };
 
-    // --- UI Constants ---
+    // --- UI Constants (Unchanged) ---
     const toastVariants = { hidden: { opacity: 0, y: 50 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 50 } };
     const buttonPress = { scale: 0.95 };
     const checkmarkVariants = { checked: { pathLength: 1 }, unchecked: { pathLength: 0 } };
@@ -586,16 +730,12 @@ const {
         </div>
     );
 
-    // Filter out tax for the main summary display
-    const visibleCalculatedSummary = Object.entries(calculatedSummary)
-        .filter(([key]) => !key.toLowerCase().includes('tax'));
-
     return (
         <div className="min-h-screen bg-gray-100 font-sans pb-32 lg:pb-10">
             
             <AnimatePresence>
                 {/* Full Screen Order Success Message */}
-                {showOrderSuccess && <OrderSuccessScreen totalAmount={totalAmount} orderDetails={finalOrderSummary} />}
+                {showOrderSuccess && <OrderSuccessScreen totalAmount={totalAmount} orderDetails={calculatedSummary} />}
             </AnimatePresence>
 
             {/* Mobile Header (Fixed) */}
@@ -665,10 +805,10 @@ const {
                             </AnimatePresence>
                         </div>
 
-                        {/* Right Column: Address Selector & Order Summary (4/12 on Desktop, Full-width on Mobile) */}
+                        {/* Right Column: Address Selector, Promo Code, & Order Summary (4/12 on Desktop) */}
                         <div className="w-full lg:w-4/12 mt-6 lg:mt-0 lg:sticky lg:top-8 self-start">
                             
-                            {/* Shipping Address Selector (Unchanged) */}
+                            {/* Shipping Address Selector */}
                             <ShippingAddressSelector
                                 profile={profileData}
                                 profileAddress={profileData?.address}
@@ -679,20 +819,49 @@ const {
                                 handleProceedToCheckout={handleProceedToCheckout}
                             />
                             
+                            {/* ⭐️ PROMO CODE INPUT ⭐️ */}
+                            <PromoCodeInput 
+                                subtotal={originalSubtotal} // Pass the base subtotal for validation calculation
+                                authToken={authToken}
+                                onDiscountApplied={handleDiscountApplied}
+                                onDiscountRemoved={handleDiscountRemoved}
+                            />
+
                             {/* UPDATED Order Summary */}
                             <div className="bg-white rounded-xl shadow-xl p-6 border border-gray-200 mt-6">
                                 <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center"><DollarSign size={20} className="mr-2 text-green-600" /> Payment Summary</h2>
+                                
+                                {/* <p className="text-sm font-semibold text-gray-600 mb-3">
+                                    Total Weight: {totalWeightKg.toFixed(2)} KG (Estimated)
+                                </p> */}
+
                                 <div className="space-y-3 text-sm text-gray-600">
                                     
-                                    {/* Calculated Summary Details (Simplified) */}
+                                    {/* Calculated Summary Details */}
                                     <div className="flex justify-between">
                                         <span>Subtotal (Product Value)</span>
-                                        <span className="font-medium text-gray-800">₹{subtotal.toFixed(2)}</span>
+                                        <span className="font-medium text-gray-800">₹{originalSubtotal.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between text-red-500">
-                                        <span>Discount</span>
-                                        <span>- ₹{deliveryDiscount.toFixed(2)}</span>
+
+                                    {/* Actual Delivery Cost and Product Value Discount are now hidden but stored in DB */}
+                                    
+                                    <div className="flex justify-between font-bold border-b border-dashed pb-2">
+                                        <span>Delivery Charge</span>
+                                        <span className="text-gray-800">₹{deliveryDetails.finalDeliveryCharge.toFixed(2)}</span>
                                     </div>
+                                    
+                                    {/* Display Promo Discount if applied */}
+                                    {promoDiscountAmount > 0 && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, x: -10 }} 
+                                            animate={{ opacity: 1, x: 0 }} 
+                                            className="flex justify-between text-red-600 font-semibold"
+                                        >
+                                            <span>Promo Discount {promoCode ? `(${promoCode})` : ''}</span>
+                                            <span>- ₹{promoDiscountAmount.toFixed(2)}</span>
+                                        </motion.div>
+                                    )}
+
                                     <div className="flex justify-between">
                                         <span>Platform Fee</span>
                                         <span className="font-medium text-gray-800">₹{PLATFORM_FEE.toFixed(2)}</span>
@@ -707,9 +876,7 @@ const {
                                         <span>₹{totalAmount.toFixed(2)}</span>
                                     </div>
                                 </div>
-                                <p className="text-xs text-red-500 font-medium mt-3 border-t pt-2">
-                                    ⁠Delivery charge will be added additionally and the invoice and payment link will be shared by Hivictus Team shortly
-                                </p>
+                                {/* Full disclaimer removed */}
                             </div>
                         </div>
                     </div>
@@ -746,7 +913,7 @@ const {
                 shippingDetails={shippingDetails}
                 onShippingChange={handleShippingChange}
                 total={totalAmount}
-                orderSummary={calculatedSummary} // Pass the correct calculated summary
+                orderSummary={calculatedSummary}
                 isPlacingOrder={isPlacingOrder}
             />
             
@@ -849,5 +1016,151 @@ const CartItem = ({ item, onQuantityChange, onDelete, onToggleSelect, checkmarkV
                 <Trash2 size={20} className="text-red-500" />
             </motion.button>
         </motion.div>
+    );
+};
+
+// ====================================================================
+// --- PROMO CODE INPUT COMPONENT (Unchanged) ---
+// ====================================================================
+
+const PromoCodeInput = ({ subtotal, authToken, onDiscountApplied, onDiscountRemoved }) => {
+    const [code, setCode] = useState('');
+    const [status, setStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
+    const [message, setMessage] = useState('');
+    const [appliedDiscount, setAppliedDiscount] = useState(0); 
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!code) {
+            setMessage('Please enter a promo code.');
+            setStatus('error');
+            return;
+        }
+        if (!authToken) {
+            setMessage('You must be logged in to apply a code.');
+            setStatus('error');
+            return;
+        }
+
+        setStatus('loading');
+        setMessage('Checking code...');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/orders/validate-promo`, {
+                method: 'POST',
+                headers: { 'x-auth-token': authToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, currentSubtotal: subtotal }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setStatus('error');
+                setMessage(data.msg || 'Invalid promo code.');
+                onDiscountRemoved();
+                setAppliedDiscount(0);
+                return;
+            }
+
+            setStatus('success');
+            setMessage(data.msg || 'Promo code applied!');
+            setAppliedDiscount(data.discount);
+            onDiscountApplied(data.discount, data.code);
+            
+        } catch (err) {
+            console.error('Promo code validation error:', err);
+            setStatus('error');
+            setMessage('Server error during validation.');
+            onDiscountRemoved();
+            setAppliedDiscount(0);
+        }
+    };
+    
+    const handleRemoveCode = () => {
+        setCode('');
+        setStatus('idle');
+        setMessage('');
+        setAppliedDiscount(0);
+        onDiscountRemoved();
+    };
+
+    const statusIconVariants = {
+        hidden: { scale: 0, opacity: 0, rotate: -180 },
+        visible: { scale: 1, opacity: 1, rotate: 0, transition: { type: 'spring', stiffness: 500, damping: 30 } },
+    };
+
+    const isApplied = status === 'success';
+
+    return (
+        <div className="bg-white rounded-xl shadow-xl p-6 border border-gray-200 mt-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                <Tag size={20} className="mr-2 text-green-600" /> Promo Code
+            </h2>
+            
+            <form onSubmit={handleSubmit} className="flex gap-2">
+                <input
+                    type="text"
+                    placeholder="Enter Code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    disabled={isApplied || status === 'loading'}
+                    className={`flex-grow p-3 border rounded-lg text-sm transition-all ${isApplied ? 'bg-green-50 border-green-500' : status === 'error' ? 'border-red-500' : 'border-gray-300 focus:border-green-500'}`}
+                />
+                
+                {isApplied ? (
+                    <motion.button
+                        type="button"
+                        onClick={handleRemoveCode}
+                        className="bg-red-500 text-white p-3 rounded-lg font-semibold flex items-center justify-center hover:bg-red-600 transition-colors"
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        Remove
+                    </motion.button>
+                ) : (
+                    <motion.button
+                        type="submit"
+                        className={`p-3 rounded-lg text-white font-semibold flex items-center justify-center transition-colors disabled:bg-gray-400 ${status === 'loading' ? 'bg-gray-500' : 'bg-green-600 hover:bg-green-700'}`}
+                        disabled={status === 'loading'}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        {status === 'loading' ? <Loader size={20} className="animate-spin" /> : 'Apply'}
+                    </motion.button>
+                )}
+            </form>
+
+            <AnimatePresence mode="wait">
+                {status !== 'idle' && (
+                    <motion.div
+                        key={status}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className={`mt-3 p-3 rounded-lg flex items-center transition-colors ${
+                            status === 'success' ? 'bg-green-100 text-green-700 border border-green-300' :
+                            status === 'error' ? 'bg-red-100 text-red-700 border border-red-300' :
+                            'bg-gray-100 text-gray-700'
+                        }`}
+                    >
+                        <motion.div variants={statusIconVariants} initial="hidden" animate="visible" className="mr-2">
+                            {status === 'success' && <CheckCircle size={20} />}
+                            {status === 'error' && <XCircle size={20} />}
+                            {status === 'loading' && <Loader size={20} className="animate-spin" />}
+                        </motion.div>
+                        <span className="text-sm font-medium">{message}</span>
+                    </motion.div>
+                )}
+                {isApplied && appliedDiscount > 0 && (
+                    <motion.div
+                        key="discount-info"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="mt-3 p-2 text-sm font-bold text-green-700 bg-green-50 border-t border-green-300 rounded-b-lg"
+                    >
+                        Discount Applied: - ₹{appliedDiscount.toFixed(2)}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     );
 };
