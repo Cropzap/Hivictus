@@ -1,107 +1,185 @@
-import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // Assuming React Router is used
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom'; // Import Link
 import { AnimatePresence, motion } from 'framer-motion';
-import { toast } from 'react-toastify'; // Using a real toast library for better UX
+import { toast } from 'react-toastify'; 
 import 'react-toastify/dist/ReactToastify.css';
-const API_URL = import.meta.env.VITE_API_URL;
+import { ShoppingCart, User, Star } from 'lucide-react'; // Import Lucide icons for the new UI
 
-// --- Icons as SVG components ---
+const API_URL = import.meta.env.VITE_API_URL;
+const FALLBACK_IMAGE_URL = 'https://placehold.co/400x400/F3F4F6/9CA3AF?text=Product';
+
+// --- SVG Icons (Simplified for brevity, assuming you have them defined elsewhere or use Lucide) ---
 const SpinnerIcon = (props) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <path fill="currentColor" d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0 26.5-21.5 48-48 48s-48-21.5-48-48s21.5-48 48-48s48 21.5 48 48zM48 304c-26.5 0-48-21.5-48-48s21.5-48 48-48s48 21.5 48 48s-21.5 48-48 48zm416 0c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zM142.9 142.9c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm226.3 226.3c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm-226.3 67.9c-18.7 18.7-49.1 18.7-67.9 0s-18.7-49.1 0-67.9s49.1-18.7 67.9 0s18.7 49.1 0 67.9zm226.3-226.3c-18.7 18.7-49.1 18.7-67.9 0s-18.7-49.1 0-67.9s49.1-18.7 67.9 0s18.7 49.1 0 67.9z"/>
+    <path fill="currentColor" d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5-48-48zm0 416c0 26.5-21.5 48-48 48s-48-21.5-48-48s21.5-48 48-48s48 21.5 48 48zM48 304c-26.5 0-48-21.5-48-48s21.5-48 48-48s48 21.5 48 48s-21.5 48-48 48zm416 0c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zM142.9 142.9c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm226.3 226.3c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm-226.3 67.9c-18.7 18.7-49.1 18.7-67.9 0s-18.7-49.1 0-67.9s49.1-18.7 67.9 0s18.7 49.1 0 67.9zm226.3-226.3c-18.7 18.7-49.1 18.7-67.9 0s-18.7-49.1 0-67.9s49.1-18.7 67.9 0s18.7 49.1 0 67.9z"/>
   </svg>
 );
+// --- End Icons ---
 
-const StarIcon = (props) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
-    <path fill="currentColor" d="M259.3 17.8L194 150.2 47.9 171.5c-26.2 3.8-36.7 35.7-18.3 54.3l105.7 103-25 145.5c-4.5 26.3 23.2 46.5 46.4 33.7L288 439.6l128.9 68.4c23.2 12.8 50.9-7.1 46.4-33.7l-25-145.5 105.7-103c18.4-18.6 7.9-50.5-18.3-54.3L382 150.2 316.7 17.8c-11.7-24.2-45.5-24.2-57.2 0z"/>
-  </svg>
-);
-
-const ShoppingCartIcon = (props) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
-    <path fill="currentColor" d="M96 0C78.4 0 64 14.4 64 32V64H24C10.7 64 0 74.7 0 88s10.7 24 24 24h32v48c0 22.1 17.9 40 40 40h48c22.1 0 40-17.9 40-40v-48h96v48c0 22.1 17.9 40 40 40h48c22.1 0 40-17.9 40-40v-48h32c13.3 0 24-10.7 24-24s-10.7-24-24-24h-32V64h-48v48c0 22.1-17.9 40-40 40h-48c-22.1 0-40-17.9-40-40v-48H96V32c0-17.6-14.4-32-32-32zM384 192v240c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V192H384zm-224 0v240c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V192H160zM320 192v240c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V192H320z"/>
-  </svg>
-);
-
-const UserCircleIcon = (props) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <path fill="currentColor" d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zM256 128c35.3 0 64 28.7 64 64s-28.7 64-64 64-64-28.7-64-64 28.7-64 64-64zm96 256h-192c-52.9 0-96-43.1-96-96 0-21.5 7.2-41.4 19.3-57.5 28.5 20.3 62.8 32.5 98.7 32.5h119c35.9 0 70.2-12.2 98.7-32.5 12.1 16.1 19.3 36 19.3 57.5 0 52.9-43.1 96-96 96z"/>
-  </svg>
-);
-
-// --- PriceUnit Component ---
+// --- Helper Components ---
 const PriceUnit = ({ price, unit }) => (
-  <p className="font-bold text-gray-900 text-lg">
-    ${price?.toFixed(2) || 'N/A'}{unit && <span className="text-sm font-normal text-gray-500"> / {unit}</span>}
+  <p className="font-extrabold text-gray-900 text-xl">
+    ₹{price?.toFixed(2) || 'N/A'}{unit && <span className="text-sm font-normal text-gray-500">/{unit}</span>}
   </p>
 );
 
-// --- ProductCard Component ---
-const ProductCard = ({ product, onAddToCart, onProductClick }) => {
+const renderStars = (rating) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating - fullStars >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    const starSize = 14;
+
+    return (
+        <div className="flex items-center text-emerald-500">
+            {[...Array(fullStars)].map((_, i) => (
+                <Star key={`full-${i}`} size={starSize} fill="currentColor" className="text-emerald-500" />
+            ))}
+            {hasHalfStar && <Star size={starSize} fill="url(#halfGradient)" className="text-emerald-500" />}
+            {[...Array(emptyStars)].map((_, i) => (
+                <Star key={`empty-${i}`} size={starSize} className="text-gray-300" />
+            ))}
+            {/* SVG Gradient definition for half star */}
+            <svg width="0" height="0">
+                <defs>
+                    <linearGradient id="halfGradient">
+                        <stop offset="50%" stopColor="#10b981" /> {/* Emerald-500 */}
+                        <stop offset="50%" stopColor="#d1d5db" /> {/* Gray-300 */}
+                    </linearGradient>
+                </defs>
+            </svg>
+        </div>
+    );
+};
+
+// --- ProductCard Component (NEW UI) ---
+const ProductCard = ({ product, onAddToCart }) => {
   const handleImageError = (e) => {
     e.target.onerror = null;
-    e.target.src = 'https://placehold.co/400x400/F3F4F6/9CA3AF?text=Product';
+    e.target.src = FALLBACK_IMAGE_URL;
   };
+
+  const getDisplayImage = () => {
+    let url;
+    
+    // 1. Try to get the first image from the imageUrls array
+    if (product.imageUrls && product.imageUrls.length > 0) {
+        url = product.imageUrls[0];
+    }
+    // 2. Fallback to imageUrl property (if any)
+    else if (product.imageUrl) {
+         url = product.imageUrl;
+    }
+
+    if (url) {
+        // Check if it looks like a raw Base64 string
+        const isBase64 = url.length > 100 && !url.startsWith("http") && !url.startsWith("data:");
+        if (isBase64) {
+            return `data:image/jpeg;base64,${url}`;
+        }
+        return url;
+    }
+
+    return FALLBACK_IMAGE_URL;
+  };
+
+  const productId = product._id;
+  const displayRating = product.averageRating || 0;
+  const isOutOfStock = product.quantity === 0 || product.quantity === undefined;
+  const shortDescription = product.description ? product.description.substring(0, 50) + '...' : 'Fresh produce.';
+  const reviewCount = product.totalRatings || 0;
 
   return (
     <motion.div
-      className="relative bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-300 flex flex-col group border border-gray-200 hover:shadow-2xl hover:border-green-300 h-96 transform hover:scale-105 hover:-translate-y-2 cursor-pointer"
-      onClick={() => onProductClick(product._id)}
-      layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
+      // ⭐️ CARD UI STYLES
+      className="relative bg-white rounded-2xl shadow-lg transition-all duration-300 flex flex-col group border border-gray-100 hover:border-emerald-400 h-[440px] w-full flex-shrink-0 cursor-pointer"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.03, y: -3, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
+      whileTap={{ scale: 0.99 }}
     >
-      <div className="flex flex-col h-full">
-        <div className="relative w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+      <Link to={`/product/${productId}`} className="flex flex-col h-full">
+        {/* Product Image */}
+        <div className="relative w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden rounded-t-xl">
           <img
-            src={product.imageUrl || 'https://placehold.co/400x400/F3F4F6/9CA3AF?text=Product'}
+            src={getDisplayImage()}
             alt={product.name}
-            className="object-cover w-full h-full transition-transform duration-300 ease-out group-hover:scale-110"
+            className="object-cover w-full h-full transition-transform duration-500 ease-out group-hover:scale-110"
             onError={handleImageError}
           />
+          {/* Out of Stock Badge */}
+          {isOutOfStock && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-md z-10">
+              OOS
+            </div>
+          )}
         </div>
-        <div className="p-4 flex flex-col flex-grow text-xs sm:text-xs md:text-sm">
-          <h3 className="font-semibold text-gray-800 line-clamp-2 mb-1">
+
+        {/* Product Details (Now includes the button inside the flow) */}
+        <div className="p-4 flex flex-col flex-grow text-sm">
+          {/* Name - text-lg for prominence */}
+          <h3 className="font-extrabold text-gray-800 line-clamp-2 mb-1 text-lg leading-snug">
             {product.name}
           </h3>
-          <p className="text-gray-500 line-clamp-1 text-xs">
-            {product.category?.name || 'Category'} &bull; {product.subCategory || 'Subcategory'}
-          </p>
-          <div className="flex items-end justify-between mt-auto">
+          
+          {/* Price & Unit (One Line) */}
+          <div className="flex items-center justify-between mb-2">
             <PriceUnit price={product.price} unit={product.unit} />
-            <div className="flex items-center bg-green-50 text-green-700 px-2 py-0.5 rounded-full text-xs font-semibold">
-              <span className="mr-1">{product.rating ? product.rating.toFixed(1) : 'N/A'}</span>
-              <StarIcon className="w-3 h-3 text-green-500" />
-            </div>
           </div>
-          <div className="flex items-center text-gray-600 mt-1 text-[10px]">
-            <UserCircleIcon className="w-3 h-3 mr-1 text-gray-400" />
-            <span className="font-medium line-clamp-1">
-              Sold by: {product.sellerName}
+
+          {/* Short Description */}
+          <div className="flex justify-between items-center text-gray-600 mb-3">
+             <p className="text-gray-500 line-clamp-1 text-xs" title={product.description}>{shortDescription}</p>
+          </div>
+          
+          {/* Rating Display */}
+          <div className="flex items-center gap-2 text-xs font-semibold whitespace-nowrap mb-3">
+             {renderStars(displayRating)}
+             <span className="text-gray-700 font-extrabold">{displayRating > 0 ? displayRating.toFixed(1) : 'N/A'}</span>
+          </div>
+          
+          {/* ⭐️ ADD TO CART BUTTON MOVED HERE (Inside the content area) */}
+          <motion.button
+            className={`w-full py-2 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-300 shadow-md mb-3
+              ${isOutOfStock
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+              }`}
+            title={isOutOfStock ? 'Out of Stock' : 'Add to Basket'}
+            whileHover={{ scale: isOutOfStock ? 1 : 1.02 }}
+            whileTap={{ scale: isOutOfStock ? 1 : 0.98 }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // Pass the product ID to the handler provided by the parent
+              onAddToCart(productId);
+            }}
+            disabled={isOutOfStock}
+          >
+            {isOutOfStock ? (
+              'Out of Stock'
+            ) : (
+              <>
+                <ShoppingCart size={16} className="mr-2" /> Add to Basket
+              </>
+            )}
+          </motion.button>
+
+          {/* ⭐️ Seller Info and Review Count (One Line, using grid for truncation) */}
+          <div className="grid grid-cols-[1fr_auto] items-center text-gray-600 border-t pt-2 border-gray-100 mt-auto text-xs">
+            <div className="flex items-center min-w-0">
+              <User className="mr-1 text-emerald-400 flex-shrink-0" size={12} />
+              {/* line-clamp-1 ensures the text truncates if it's too long, keeping reviews on the same line */}
+              <span className="font-medium text-gray-700 line-clamp-1 overflow-hidden text-ellipsis">
+                {product.sellerName || 'Local Farm'}
+              </span>
+            </div>
+            {/* whitespace-nowrap ensures review count stays together */}
+            <span className="text-gray-500 font-semibold whitespace-nowrap ml-2 text-right text-[10px]">
+              ({reviewCount} reviews)
             </span>
           </div>
         </div>
-      </div>
-      <div className="absolute top-2 right-2">
-        <button
-          className={`bg-white p-2 rounded-full shadow-md transition-colors duration-200 transform-gpu
-            ${product.quantity === 0
-              ? 'text-gray-400 cursor-not-allowed'
-              : 'text-green-600 hover:text-green-700 hover:scale-115 active:scale-90'
-            }`}
-          title={product.quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToCart(product._id);
-          }}
-          disabled={product.quantity === 0}
-        >
-          <ShoppingCartIcon className="w-4 h-4" />
-        </button>
-      </div>
+      </Link>
     </motion.div>
   );
 };
@@ -112,23 +190,32 @@ const BestSellingProducts = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const authToken = localStorage.getItem('authToken'); // Get the real token
+  const authToken = localStorage.getItem('authToken'); 
 
   // Fetch product data from the API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/products/best-selling`);
+        // Assuming the backend endpoint is correctly updated to filter by rating > 3
+        const response = await fetch(`${API_URL}/products/best-selling`); 
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         const data = await response.json();
-        setProducts(data);
-        toast.success('Products loaded successfully!');
+        
+        // **Client-side Filter (as a safety measure, though backend should do this)**
+        const filteredProducts = data.filter(product => {
+            // Safely check averageRating, ensuring it's treated as a number
+            const rating = parseFloat(product.averageRating) || 0;
+            return rating > 3;
+        });
+
+        setProducts(filteredProducts);
+        toast.success('Top rated products loaded successfully!');
       } catch (err) {
         console.error('Error fetching best-selling products:', err);
-        setError('Failed to load best-selling products. Please try again later.');
+        setError('Failed to load top rated products. Please try again later.');
         toast.error('Failed to load products.');
       } finally {
         setLoading(false);
@@ -137,7 +224,7 @@ const BestSellingProducts = () => {
     fetchProducts();
   }, []);
 
-  // Handler for adding a product to the cart
+  // Handler for adding a product to the cart (Unchanged)
   const handleAddToCart = async (productId) => {
     if (!authToken) {
       toast.error('Please log in to add items to your cart.');
@@ -156,12 +243,10 @@ const BestSellingProducts = () => {
       });
 
       if (!response.ok) {
-        // Attempt to parse JSON, but handle cases where it's not JSON (like a 404 HTML page)
         let errorData = {};
         try {
           errorData = await response.json();
         } catch (e) {
-          // If the response isn't JSON, fall back to a generic error message
           throw new Error(`HTTP error! Status: ${response.status}. Expected JSON, but received a different format.`);
         }
         
@@ -195,7 +280,7 @@ const BestSellingProducts = () => {
     return (
       <div className="flex justify-center items-center h-64 py-10">
         <SpinnerIcon className="animate-spin text-emerald-600 w-10 h-10 mr-3" />
-        <p className="text-gray-700 text-lg">Loading best-selling products...</p>
+        <p className="text-gray-700 text-lg">Loading top rated products...</p>
       </div>
     );
   }
@@ -211,7 +296,7 @@ const BestSellingProducts = () => {
   if (products.length === 0) {
     return (
       <div className="flex justify-center items-center h-64 py-10">
-        <p className="text-gray-600 text-lg">No best-selling products found at the moment.</p>
+        <p className="text-gray-600 text-lg">No products with a rating above 3 found at the moment.</p>
       </div>
     );
   }
@@ -220,7 +305,7 @@ const BestSellingProducts = () => {
     <div className="relative z-0 bg-white py-10 sm:py-12 px-4 sm:px-6 md:px-8 font-sans">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">Best Selling Agriculture Products</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Top Rated Products</h2>
           <button
             onClick={handleSeeAllClick}
             className="text-emerald-600 hover:text-emerald-800 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 rounded-full px-4 py-2"
@@ -238,7 +323,7 @@ const BestSellingProducts = () => {
                 key={product._id}
                 product={product}
                 onAddToCart={handleAddToCart}
-                onProductClick={handleProductClick}
+                onProductClick={handleProductClick} // Note: The new card uses Link internally, but this function is kept for potential future use.
               />
             ))}
           </motion.div>

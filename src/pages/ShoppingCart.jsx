@@ -18,62 +18,81 @@ const TAX_RATE = 0.00;
 
 /**
  * Converts a product's quantity and unit into weight in Kilograms (KG).
- * For non-weight units (piece, jar, etc.), it relies on a weightPerUnitKg field 
- * from the product details, defaulting to 0.25 kg if not found.
+ * Handles compound units like "200 Grams" or "1 Liter".
+ * The total weight for the item will be: (Cart Quantity) * (Weight of one unit).
  */
 const getUnitWeightKg = (quantity, unit, productDetails) => {
-    const qty = parseFloat(quantity);
-    if (isNaN(qty) || qty <= 0) return 0;
+    const cartQuantity = parseFloat(quantity);
+    if (isNaN(cartQuantity) || cartQuantity <= 0) return 0;
     
-    const lowerUnit = unit.toLowerCase().trim();
+    // Normalize the unit string from the database
+    const rawUnit = unit.toLowerCase().trim(); 
     
-    // Default fallback weight for counted items (piece, jar, etc.)
-    let calculatedWeight = 0;
+    // --- 1. Attempt to parse compound units (e.g., "500 grm", "1 liter") ---
+    // Regex matches: 
+    // ^(\d+(\.\d+)?)\s* - Start, capture number (e.g., 500, 1.5)
+    // (g|kg|l|ml|gram|liter|grm|ml) - Capture unit type (grm is added for flexibility)
+    const compoundMatch = rawUnit.match(/^(\d+(\.\d+)?)\s*(g|kg|l|ml|gram|liter|grm|ml)/);
+    
+    let weightPerOneUnit = 0; // Weight of a single unit of the product (in KG)
 
-    // 1. Handle standard weight/volume units (KG, G, L, ML)
-    switch (lowerUnit) {
+    if (compoundMatch) {
+        const value = parseFloat(compoundMatch[1]);
+        const unitType = compoundMatch[3];
+        
+        switch (unitType) {
+            case 'kg':
+            case 'l':
+            case 'liter':
+                weightPerOneUnit = value; // 1 unit = [Value] kg/liter
+                break;
+            case 'g':
+            case 'gram':
+            case 'grm':
+                weightPerOneUnit = value / 1000; // Grams/Grm to KG
+                break;
+            case 'ml':
+                weightPerOneUnit = value / 1000; // Milliliters to KG
+                break;
+            default:
+                // Should not happen if regex is correct
+                break;
+        }
+        
+        // Return (Cart Quantity) * (Weight of one unit)
+        return cartQuantity * weightPerOneUnit;
+    }
+    
+    // --- 2. Handle simple units (e.g., if the DB unit column only contains "KG" or "piece") ---
+    switch (rawUnit) {
         case 'kg':
         case 'kilogram':
         case 'l':
         case 'liter':
-            return qty; // 1:1 conversion (1 kg, 1 liter = 1 kg)
+            return cartQuantity; // 1:1 conversion
             
         case 'g':
         case 'gram':
-            return qty / 1000; // Grams to KG
+            return cartQuantity / 1000; 
             
         case 'ml':
         case 'milliliter':
-            return qty / 1000; // Milliliters to KG
+            return cartQuantity / 1000;
             
         case 'piece':
         case 'bunch':
         case 'unit':
         case 'jar':
-            // 2. Handle counted units: Use weightPerUnitKg if available, otherwise default to 0.25kg
-            let weightPerUnit = 0.25; 
+            // Handle counted units: Use weightPerUnitKg if available, otherwise default to 0.25kg
+            let defaultWeight = 0.25; 
             if (productDetails?.weightPerUnitKg) {
-                weightPerUnit = parseFloat(productDetails.weightPerUnitKg);
+                defaultWeight = parseFloat(productDetails.weightPerUnitKg);
             }
-            return qty * weightPerUnit; 
+            return cartQuantity * defaultWeight; 
             
         default:
-            // 3. Attempt to parse compound units (like "500g")
-            const matchMass = lowerUnit.match(/^(\d+(\.\d+)?)\s?(g|kg|l|ml)$/);
-            
-            if (matchMass) {
-                const value = parseFloat(matchMass[1]);
-                const unitType = matchMass[3];
-                
-                if (unitType === 'g') calculatedWeight = value / 1000;
-                else if (unitType === 'kg' || unitType === 'l') calculatedWeight = value;
-                else if (unitType === 'ml') calculatedWeight = value / 1000;
-                
-                return qty * calculatedWeight;
-            }
-
             console.warn(`Unknown unit '${unit}'. Assuming 1 unit = 1 kg.`);
-            return qty; // Default to 1 unit = 1 kg if all parsing fails
+            return cartQuantity; 
     }
 };
 
@@ -937,25 +956,40 @@ const CartPage = () => {
 
 export default CartPage;
 
-// --- CartItem Component (Unchanged) ---
+// --- CartItem Component ---
 
 const CartItem = ({ item, onQuantityChange, onDelete, onToggleSelect, checkmarkVariants, buttonPress }) => {
     
-    const getImageUrl = (item) => {
-        let url = (item.productDetails?.imageUrls && item.productDetails.imageUrls.length > 0)
-            ? item.productDetails.imageUrls[0]
-            : item.imageUrl;
+    // FIX: Refactored image retrieval to correctly handle the Base64 array format.
+    const getDisplayImage = () => {
+        let url;
+        
+        // 1. Try to get the first image from the populated productDetails array
+        // We use optional chaining extensively here since `productDetails` is populated data.
+        if (item?.productDetails?.imageUrls?.length > 0) {
+            url = item.productDetails.imageUrls[0];
+        }
+        // 2. Fallback to item.imageUrl (from mapping/legacy field, if any)
+        else if (item?.imageUrl) {
+             url = item.imageUrl;
+        }
 
         if (url) {
-            const isBase64 = url.length > 100 && !url.startsWith('http') && !url.startsWith('data:');
+            // Check if it looks like a raw Base64 string (long, no http, no data:)
+            // We use a general length check (>100 characters) to detect if it's data rather than a short path/URL.
+            const isBase64 = url.length > 100 && !url.startsWith("http") && !url.startsWith("data:");
             if (isBase64) {
+                // Prepend the data URI prefix for JPEG Base64
                 return `data:image/jpeg;base64,${url}`;
             }
+            // If it's a URL or already prefixed data URI, return as is
+            return url;
         }
-        return url || FALLBACK_IMAGE_URL;
+
+        return FALLBACK_IMAGE_URL;
     };
 
-    const displayImageUrl = getImageUrl(item);
+    const displayImageUrl = getDisplayImage();
 
     return (
         <motion.div

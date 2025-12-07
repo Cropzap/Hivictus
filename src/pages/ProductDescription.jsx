@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Loader, Check, X, Star, ShoppingCart, ArrowLeft, Zap, Package, MapPin, Smile,
+  Loader, Check, X, Star, ShoppingCart, ArrowLeft, Zap, Package, MapPin, Smile, User,
 } from 'lucide-react';
-// We are using lucide-react now. Fa-icons are replaced.
+import { toast } from 'react-toastify'; 
+// ⭐️ FIX APPLIED HERE: Corrected import path capitalization ⭐️
+import 'react-toastify/dist/ReactToastify.css'; 
 
 const API_URL = import.meta.env.VITE_API_URL;
-// Fallback Image URL Constant
 const FALLBACK_IMAGE_URL = 'https://placehold.co/450x450/E0E0E0/333333?text=Product Image';
 
-// Data for Why Shop With Us section
+// Data for Why Shop With Us section (Unchanged)
 const whyShopData = [
     { title: 'Farm-to-Table Freshness', description: 'Directly sourced from local farms, ensuring peak freshness.', icon: '🌱' },
     { title: 'Sustainable & Organic Choices', description: 'Commitment to eco-friendly practices and organic products.', icon: '♻️' },
@@ -18,13 +19,13 @@ const whyShopData = [
     { title: 'Prompt & Reliable Delivery', description: 'Efficient logistics to bring fresh produce right to your doorstep.', icon: '🚚' },
 ];
 
-// Mock Cart Context to resolve import error
+// Mock Cart Context (Unchanged)
 const useCart = () => ({
     fetchCartQuantity: () => console.log("MOCK: Cart quantity refreshed."),
 });
 
 
-// --- Shared Utility Components ---
+// --- Shared Utility Components (Unchanged) ---
 
 // Star Rendering Component (Using Lucide-react)
 const renderStars = (rating, size = 'w-4 h-4') => {
@@ -48,7 +49,7 @@ const renderStars = (rating, size = 'w-4 h-4') => {
   return <div className="flex space-x-0.5">{stars}</div>;
 };
 
-// Component for displaying price and quantity selection
+// Component for displaying price and quantity selection (Unchanged)
 const PriceAndQuantity = ({ product, selectedQuantity, handleQuantityChange, quantityOptions }) => (
   <div className="flex flex-col items-start lg:items-end w-full">
     {/* Price Display */}
@@ -100,9 +101,42 @@ const ReviewsSection = ({ ratings, reviewerMap }) => {
             <h3 className="text-2xl font-extrabold text-gray-800 mb-6">Customer Reviews ({ratings.length})</h3>
             <div className="space-y-6">
                 {sortedRatings.map((review, index) => {
-                    const reviewer = reviewerMap[review.userId] || { firstName: 'Loading', lastName: '', profilePicture: 'https://placehold.co/40x40/6B7280/FFFFFF?text=A' };
-                    const reviewerName = `${reviewer.firstName} ${reviewer.lastName}`;
-                    const reviewerInitials = (reviewer.firstName?.[0] || '') + (reviewer.lastName?.[0] || '');
+                    // ⭐️ Access reviewer data safely ⭐️
+                    const reviewer = reviewerMap[review.userId] || { 
+                        firstName: 'Unknown', 
+                        lastName: 'User', 
+                        profilePicture: null,
+                        name: 'Anonymous User'
+                    };
+                    
+                    // Construct the name robustly
+                    const fullName = 
+                        (reviewer.firstName || reviewer.lastName) 
+                        ? `${reviewer.firstName || ''} ${reviewer.lastName || ''}`.trim()
+                        : reviewer.name || 'Anonymous User';
+                        
+                    // Use the first letter of the first name and last name for initials (or fallback)
+                    const reviewerInitials = (reviewer.firstName?.[0] || fullName[0] || 'A') + (reviewer.lastName?.[0] || fullName.split(' ')[1]?.[0] || 'U');
+
+
+                    // Function to safely display image or initials
+                    const renderReviewerAvatar = () => {
+                        let src = reviewer.profilePicture;
+                        if (src && src.length > 100 && !src.startsWith('http') && !src.startsWith('data:')) {
+                             src = `data:image/jpeg;base66,${src}`;
+                        }
+                        
+                        return src ? (
+                            <img 
+                              src={src} 
+                              alt={fullName} 
+                              className="w-full h-full object-cover" 
+                              onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/40x40/6B7280/FFFFFF?text=A'; }}
+                            />
+                        ) : (
+                           <span className="text-green-800 font-bold text-md">{reviewerInitials}</span>
+                        );
+                    };
 
                     return (
                         <motion.div 
@@ -114,18 +148,12 @@ const ReviewsSection = ({ ratings, reviewerMap }) => {
                         >
                             <div className="flex items-start justify-between mb-3 border-b border-gray-100 pb-3">
                                 <div className='flex items-center'>
-                                    <div className="w-12 h-12 rounded-full overflow-hidden mr-3 flex-shrink-0 bg-green-100 flex items-center justify-center text-green-800 font-bold text-md border-2 border-green-300 shadow-inner">
-                                        {reviewer.profilePicture ? (
-                                            <img 
-                                              src={reviewer.profilePicture} 
-                                              alt={reviewerName} 
-                                              className="w-full h-full object-cover" 
-                                              onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/40x40/6B7280/FFFFFF?text=A'; }}
-                                            />
-                                        ) : reviewerInitials}
+                                    <div className="w-12 h-12 rounded-full overflow-hidden mr-3 flex-shrink-0 bg-green-100 flex items-center justify-center border-2 border-green-300 shadow-inner">
+                                        {renderReviewerAvatar()}
                                     </div>
                                     <div>
-                                        <p className="font-extrabold text-gray-900 text-lg">{reviewerName}</p>
+                                        {/* Display the robustly constructed full name */}
+                                        <p className="font-extrabold text-gray-900 text-lg">{fullName}</p> 
                                         <p className="text-xs text-gray-500 font-medium">Reviewed on: {new Date(review.createdAt || Date.now()).toLocaleDateString()}</p>
                                     </div>
                                 </div>
@@ -137,8 +165,6 @@ const ReviewsSection = ({ ratings, reviewerMap }) => {
                                     </span>
                                 </div>
                             </div>
-
-                            
                         </motion.div>
                     );
                 })}
@@ -146,6 +172,7 @@ const ReviewsSection = ({ ratings, reviewerMap }) => {
         </div>
     );
 };
+
 
 // --- Main Component ---
 
@@ -163,7 +190,7 @@ const ProductDescription = () => {
   const [selectedImage, setSelectedImage] = useState(FALLBACK_IMAGE_URL); 
   const [reviewerMap, setReviewerMap] = useState({}); // Map for {userId: {firstName, lastName}}
 
-  const { fetchCartQuantity } = useCart(); // Use the mocked hook
+  const { fetchCartQuantity } = useCart(); 
 
   const showToastMessage = useCallback((message, type = 'success') => {
     setToastMessage(message);
@@ -187,10 +214,24 @@ const ProductDescription = () => {
     const uniqueUserIds = [...new Set(ratings.map(r => r.userId))];
     
     const fetchPromises = uniqueUserIds.map(userId => 
+      // Fetch user data from the public profile endpoint
       fetch(`${API_URL}/profile/public/${userId}`)
-        .then(res => res.ok ? res.json() : ({ firstName: 'Unknown', lastName: 'User', profilePicture: null }))
-        .then(data => [userId, data])
-        .catch(() => [userId, { firstName: 'Error', lastName: 'Loading', profilePicture: null }])
+        .then(res => res.ok ? res.json() : ({ name: 'Unknown User' })) // Fallback handles missing data
+        .then(data => {
+             // ⭐️ IMPROVEMENT: Map to a consistent structure, handling various name inputs ⭐️
+             const fullName = data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim();
+             const nameParts = fullName.split(' ');
+             
+             const userProfile = { 
+                 // If name is found, try to assign parts, else use the whole name.
+                 firstName: data.firstName || nameParts[0] || '', 
+                 lastName: data.lastName || nameParts.slice(1).join(' ') || '',
+                 name: data.name, // Store the primary full name
+                 profilePicture: data.profilePicture 
+             };
+             return [userId, userProfile];
+        })
+        .catch(() => [userId, { name: 'Error Loading', firstName: '', lastName: '', profilePicture: null }])
     );
 
     const results = await Promise.all(fetchPromises);
@@ -208,10 +249,18 @@ const ProductDescription = () => {
         }
         const data = await response.json();
         
-        // --- 🔑 IMAGE FIX: Use 'imageUrls' from your data format 🔑 ---
-        const images = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
+        // --- IMAGE FIX: Use 'imageUrls' from your data format ---
+        let images = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
           ? data.imageUrls
           : [data.imageUrl || FALLBACK_IMAGE_URL]; 
+          
+        // Ensure Base64 images are correctly prefixed for preview
+        images = images.map(url => {
+            if (url && url.length > 100 && !url.startsWith("http") && !url.startsWith("data:")) {
+                return `data:image/jpeg;base64,${url}`;
+            }
+            return url;
+        });
         
         data.images = images; 
         setSelectedImage(images[0] || FALLBACK_IMAGE_URL); 
@@ -260,7 +309,6 @@ const ProductDescription = () => {
           localStorage.removeItem('userData');
           navigate('/login');
         } else {
-          // Robust error parsing for the backend's JSON error response
           const errorData = await response.json();
           const errorMessage = errorData.detail || errorData.message || `Server Error (Status: ${response.status})`;
           
