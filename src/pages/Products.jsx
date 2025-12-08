@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Star,
   ShoppingCart,
@@ -14,7 +14,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
-// REMOVED: import 'react-toastify/dist/ReactToastify.css';
+// NOTE: Corrected import path capitalization for Vite
+import 'react-toastify/dist/ReactToastify.css'; 
 
 // API Base URL (Configure this based on your backend environment)
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -23,29 +24,22 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 const FALLBACK_IMAGE_URL = 'https://placehold.co/400x400/E5E7EB/9CA3AF?text=Product';
 
 // ====================================================================
-// --- Utility Functions for URL Slugs ---
+// --- Utility Functions for URL Slugs (Unchanged) ---
 // ====================================================================
 
 /**
  * Converts a clean string (e.g., "Fresh Vegetables") into a URL slug (e.g., "fresh-vegetables").
- * @param {string} name - The category or subcategory name.
- * @returns {string | null} The slug, or null if the name is falsy or 'All'.
  */
 const createSlug = (name) => {
   if (!name || name === 'All') return null;
-  // Replaces spaces with hyphens, converts to lowercase, and removes non-alphanumeric characters (except hyphens)
   return name.toLowerCase().replace(/\s/g, '-').replace(/[^a-z0-9-]/g, '');
 };
 
 /**
  * Converts a URL slug (e.g., "fresh-vegetables") back into a clean name (e.g., "Fresh Vegetables").
- * This is the value used for UI display and filtering logic against product data.
- * @param {string} slug - The URL slug.
- * @returns {string} The clean name with capitalized words and spaces, or 'All' if the slug is falsy.
  */
 const cleanName = (slug) => {
   if (!slug) return 'All';
-  // Replace hyphens with spaces and capitalize each word
   return slug
     .replace(/-/g, ' ')
     .split(' ')
@@ -54,14 +48,10 @@ const cleanName = (slug) => {
 };
 
 /**
- * Normalizes a category or subcategory name by converting hyphens to spaces and trimming.
- * Used for safe comparison between filter values (which might be clean names) and product data.
- * @param {string} name - The category or subcategory name (can be from product data or a filter).
- * @returns {string} The normalized name for filtering, or 'All' if the name is falsy or 'All'.
+ * Normalizes a category or subcategory name.
  */
 const normalizeFilterName = (name) => {
   if (!name || name === 'All') return 'All';
-  // Replace all hyphens with a space and trim any extra whitespace
   return name.replace(/-/g, ' ').trim();
 };
 
@@ -69,7 +59,7 @@ const normalizeFilterName = (name) => {
 // --- Utility Components (ProductCard, PriceUnit, etc.) ---
 // ====================================================================
 
-// Star Rendering Component
+// Star Rendering Component (Unchanged)
 const renderStars = (rating) => {
   const stars = [];
   const fullStars = Math.floor(rating);
@@ -80,7 +70,6 @@ const renderStars = (rating) => {
     stars.push(<Star key={`full-${i}`} size={10} fill="#FACC15" color="#FACC15" />);
   }
   
-  // Renders a half star if there's a decimal component
   if (partialStar >= 0.25 && partialStar < 0.75) {
       // NOTE: Lucide doesn't have a half-star component, so we use a full star with opacity/fallback logic
       stars.push(<Star key="half" size={10} fill="#FACC15" color="#FACC15" opacity={0.5} />);
@@ -96,7 +85,7 @@ const renderStars = (rating) => {
   return <div className="flex items-center gap-0.5">{stars}</div>;
 };
 
-// Price & Unit Component
+// Price & Unit Component (Unchanged)
 const PriceUnit = ({ price, unit }) => {
   const numericPrice = typeof price === 'number' ? price : 0;
 
@@ -119,6 +108,25 @@ const PriceUnit = ({ price, unit }) => {
   );
 };
 
+// ⭐️ NEW/UPDATED: Image display logic for the card view ⭐️
+const getCardDisplayImage = (product) => {
+    // Since the backend uses select('-imageUrls'), product.imageUrls is MISSING.
+    // We rely on the backend possibly providing the main image URL in another field,
+    // or falling back entirely.
+    let url = product.imageUrl || product.imageUrls?.[0]; 
+
+    if (url) {
+        // Heuristic check: If the string is long and not a web URL, assume Base64 without prefix
+        const isRawBase64 = url.length > 100 && !url.startsWith("http") && !url.startsWith("data:");
+        if (isRawBase64) {
+            return `data:image/jpeg;base64,${url}`; // Apply prefix
+        }
+        return url; 
+    }
+    return FALLBACK_IMAGE_URL;
+};
+
+
 // --- Product Card UI Component ---
 const ProductCard = ({ product }) => {
   const [authToken, setAuthToken] = useState(null);
@@ -130,10 +138,8 @@ const ProductCard = ({ product }) => {
     }
   }, []);
 
-  // Priority: 1. imageUrls[0] 2. FALLBACK_IMAGE_URL
-  const displayImageUrl = product.imageUrls && product.imageUrls.length > 0
-    ? product.imageUrls[0]
-    : product.imageUrl || FALLBACK_IMAGE_URL;
+  const displayImageUrl = getCardDisplayImage(product); // Use the new helper function
+
 const handleAddToCart = async (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -206,7 +212,6 @@ const handleAddToCart = async (e) => {
   
   return (
     <motion.div
-      // ⭐️ INCREASED HEIGHT to h-[440px] for more space. Width is controlled by grid.
       className="relative bg-white rounded-xl shadow-lg transition-all duration-300 flex flex-col group border border-gray-100 hover:border-green-400 h-[440px]"
       variants={cardVariants}
       initial="hidden"
@@ -264,7 +269,7 @@ const handleAddToCart = async (e) => {
               }`}
             title={isOutOfStock ? 'Out of Stock' : 'Add to Basket'}
             whileHover={{ scale: isOutOfStock ? 1 : 1.02 }}
-            whileTap={{ scale: isOutOfStock ? 1 : 0.98 }}
+            whileTap={{ scale: 1.02 }} // Use full scale for hover/tap on this card type
             onClick={handleAddToCart}
             disabled={isOutOfStock}
           >
@@ -297,7 +302,7 @@ const handleAddToCart = async (e) => {
   );
 };
 
-// --- Common Filter UI Component (Refined) ---
+// --- Common Filter UI Component (Refined - Unchanged) ---
 const FilterContent = ({
   handleFilterChange,
   handlePriceRangeChange,
@@ -491,7 +496,7 @@ const FilterContent = ({
   )
 };
 
-// --- Categories Bar Component (Scrollable and Animated) ---
+// --- Categories Bar Component (Scrollable and Animated - Unchanged) ---
 const CategoriesBar = ({ categories, onSelect, selectedCategory }) => {
   const scrollRef = useRef(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768); 
@@ -664,6 +669,7 @@ const Products = () => {
       try {
         const response = await fetch(`${API_BASE_URL}/products`);
         if (!response.ok) {
+          // If 500 error is returned, throw error for display
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         const rawData = await response.json();
@@ -697,6 +703,7 @@ const Products = () => {
         setAllTypes(uniqueTypes);
 
       } catch (err) {
+        // Log the error message directly to state
         setError(err.message);
         console.error('Error fetching products:', err);
       } finally {

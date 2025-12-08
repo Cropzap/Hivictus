@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 // Create the context
 export const CartContext = createContext();
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Create a provider component
 export const CartProvider = ({ children }) => {
@@ -18,7 +19,7 @@ export const CartProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('https://api.hivictus.com/api/cart', {
+      const response = await fetch(`${API_BASE_URL}/cart`, {
         headers: {
           'x-auth-token': currentToken,
           'Content-Type': 'application/json',

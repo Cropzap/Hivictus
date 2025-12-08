@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 
 // --- Configuration and Helper Functions ---
-const CATEGORIES_API_URL = 'https://api.hivictus.com/api/categories';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+const CATEGORIES_API_URL = `${API_BASE_URL}/categories`;
 const DISPLAY_CATEGORY_COUNT = 5; // Display only the first 5 categories in the footer
 
 // Helper to convert text to a URL-friendly slug

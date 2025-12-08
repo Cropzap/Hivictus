@@ -52,41 +52,54 @@ const renderStars = (rating) => {
 };
 
 // --- ProductCard Component (NEW UI) ---
-const ProductCard = ({ product, onAddToCart }) => {
+const ProductCard = ({ product, onAddToCart, onProductClick }) => {
+  const [authToken, setAuthToken] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      setAuthToken(token);
+    }
+  }, []);
+
   const handleImageError = (e) => {
     e.target.onerror = null;
     e.target.src = FALLBACK_IMAGE_URL;
   };
 
+  // ⭐️ FIX 1: Refined Image Retrieval to correctly handle the Base64 single image field ⭐️
   const getDisplayImage = () => {
-    let url;
-    
-    // 1. Try to get the first image from the imageUrls array
-    if (product.imageUrls && product.imageUrls.length > 0) {
-        url = product.imageUrls[0];
-    }
-    // 2. Fallback to imageUrl property (if any)
-    else if (product.imageUrl) {
-         url = product.imageUrl;
-    }
+    // Rely on the backend having mapped the first image to `product.imageUrl` 
+    // when using .select('imageUrls.0') and the post-processing map.
+    const url = product.imageUrl || product.imageUrls?.[0]; 
 
     if (url) {
-        // Check if it looks like a raw Base64 string
-        const isBase64 = url.length > 100 && !url.startsWith("http") && !url.startsWith("data:");
-        if (isBase64) {
+        // Heuristic check: If the string is long and not a web URL, assume Base64 without prefix
+        const isRawBase64 = url.length > 100 && !url.startsWith("http") && !url.startsWith("data:");
+        if (isRawBase64) {
             return `data:image/jpeg;base64,${url}`;
         }
         return url;
     }
-
     return FALLBACK_IMAGE_URL;
   };
 
   const productId = product._id;
   const displayRating = product.averageRating || 0;
-  const isOutOfStock = product.quantity === 0 || product.quantity === undefined;
+  
+  // ⭐️ REMOVED OOS CHECK: Assume product is always available ⭐️
+  const isOutOfStock = false; 
+  
   const shortDescription = product.description ? product.description.substring(0, 50) + '...' : 'Fresh produce.';
   const reviewCount = product.totalRatings || 0;
+  const displayImageUrl = getDisplayImage();
+
+  const handleCardAddToCart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onAddToCart(productId); // Use the handler provided by the parent
+  };
+
 
   return (
     <motion.div
@@ -101,17 +114,17 @@ const ProductCard = ({ product, onAddToCart }) => {
         {/* Product Image */}
         <div className="relative w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden rounded-t-xl">
           <img
-            src={getDisplayImage()}
+            src={displayImageUrl}
             alt={product.name}
             className="object-cover w-full h-full transition-transform duration-500 ease-out group-hover:scale-110"
             onError={handleImageError}
           />
-          {/* Out of Stock Badge */}
-          {isOutOfStock && (
+          {/* Out of Stock Badge (Removed display condition) */}
+          {/* {isOutOfStock && (
             <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-md z-10">
               OOS
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Product Details (Now includes the button inside the flow) */}
@@ -137,31 +150,18 @@ const ProductCard = ({ product, onAddToCart }) => {
              <span className="text-gray-700 font-extrabold">{displayRating > 0 ? displayRating.toFixed(1) : 'N/A'}</span>
           </div>
           
-          {/* ⭐️ ADD TO CART BUTTON MOVED HERE (Inside the content area) */}
+          {/* ⭐️ ADD TO CART BUTTON MOVED HERE (Inside the content area) ⭐️ */}
+          {/* Note: The button is always enabled now */}
           <motion.button
             className={`w-full py-2 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-300 shadow-md mb-3
-              ${isOutOfStock
-                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+              bg-emerald-600 text-white hover:bg-emerald-700
               }`}
-            title={isOutOfStock ? 'Out of Stock' : 'Add to Basket'}
-            whileHover={{ scale: isOutOfStock ? 1 : 1.02 }}
-            whileTap={{ scale: isOutOfStock ? 1 : 0.98 }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              // Pass the product ID to the handler provided by the parent
-              onAddToCart(productId);
-            }}
-            disabled={isOutOfStock}
+            title={'Add to Basket'}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleCardAddToCart} 
           >
-            {isOutOfStock ? (
-              'Out of Stock'
-            ) : (
-              <>
-                <ShoppingCart size={16} className="mr-2" /> Add to Basket
-              </>
-            )}
+            <ShoppingCart size={16} className="mr-2" /> Add to Basket
           </motion.button>
 
           {/* ⭐️ Seller Info and Review Count (One Line, using grid for truncation) */}
@@ -233,6 +233,8 @@ const BestSellingProducts = () => {
     }
 
     try {
+      // NOTE: We rely on the backend to retrieve the full imageUrls when adding to cart
+      // We only pass the minimal ID and quantity here.
       const response = await fetch(`${API_URL}/cart/add`, {
         method: 'POST',
         headers: {
@@ -323,7 +325,7 @@ const BestSellingProducts = () => {
                 key={product._id}
                 product={product}
                 onAddToCart={handleAddToCart}
-                onProductClick={handleProductClick} // Note: The new card uses Link internally, but this function is kept for potential future use.
+                onProductClick={handleProductClick}
               />
             ))}
           </motion.div>
